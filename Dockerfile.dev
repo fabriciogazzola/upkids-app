@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Necessário para o Hot Reload funcionar corretamente em sistemas Linux/Docker
+RUN apk add --no-cache libc6-compat
+
+COPY package.json package-lock.json ./
+# Instalamos todas as dependências (incluindo as de desenvolvimento)
+RUN npm install
+
+COPY . .
+
+# Variáveis para garantir que o Next.js aceite conexões externas no Docker
+ENV PORT 3002
+ENV HOSTNAME "0.0.0.0"
+ENV NODE_ENV development
+
+EXPOSE 3002
+
+# Rodando em modo desenvolvimento
+CMD ["npm", "run", "dev", "--", "-p", "3002"]

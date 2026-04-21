@@ -1,0 +1,51 @@
+services:
+  # --- APLICAÇÃO NEXT.JS ---
+  app-upkids-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ${PROJECT_NAME}-nextjs
+    restart: always
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - NODE_ENV=${NODE_ENV}
+    depends_on:
+      - app-upkids-db-prod
+    env_file:
+      - .env
+
+  # --- POSTGRESQL DE PRODUÇÃO ---
+  app-upkids-db-prod:
+    image: postgres:15-alpine
+    container_name: ${PROJECT_NAME}-postgres-prod
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_PROD_USER}
+      - POSTGRES_PASSWORD=${DB_PROD_PASSWORD}
+      - POSTGRES_DB=${DB_PROD_NAME}
+    volumes:
+      - pg_prod_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PROD_PORT}:5432"
+
+  # --- POSTGRESQL DE DESENVOLVIMENTO ---
+  app-upkids-db-dev:
+    image: postgres:15-alpine
+    container_name: ${PROJECT_NAME}-postgres-dev
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_DEV_USER}
+      - POSTGRES_PASSWORD=${DB_DEV_PASSWORD}
+      - POSTGRES_DB=${DB_DEV_NAME}
+    volumes:
+      - pg_dev_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_DEV_PORT_EXTERNAL}:5432"
+
+volumes:
+  pg_prod_data:
+    name: ${PROJECT_NAME}-prod-vol
+  pg_dev_data:
+    name: ${PROJECT_NAME}-dev-vol
