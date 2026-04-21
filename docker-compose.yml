@@ -1,27 +1,36 @@
+
+
 services:
-  # --- APLICAÇÃO NEXT.JS (MODO DEV) ---
+  # --- APLICAÇÃO NEXT.JS ---
   app-upkids-web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ${PROJECT_NAME}-nextjs-dev
+    container_name: ${PROJECT_NAME}-nextjs
     restart: always
     ports:
       - "${APP_PORT}:${APP_PORT}"
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - NODE_ENV=development
-      - HOST=0.0.0.0      # Garante que o Next escute em todas as interfaces
-      - PORT=${APP_PORT}  # Garante que o Next use a porta do seu .env
-    volumes:
-      - .:/app            # Sincroniza o código local com o container
-      - /app/node_modules # Protege os pacotes instalados no container
-      - /app/.next        # Evita conflitos de build entre local e container
-    command: npm run dev  # Comando para habilitar o Hot Reload
+      - NODE_ENV=${NODE_ENV}
     depends_on:
-      - app-upkids-db-dev # No modo dev, focar no banco de dev
+      - app-upkids-db-prod
     env_file:
       - .env
+
+  # --- POSTGRESQL DE PRODUÇÃO ---
+  app-upkids-db-prod:
+    image: postgres:15-alpine
+    container_name: ${PROJECT_NAME}-postgres-prod
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_PROD_USER}
+      - POSTGRES_PASSWORD=${DB_PROD_PASSWORD}
+      - POSTGRES_DB=${DB_PROD_NAME}
+    volumes:
+      - pg_prod_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PROD_PORT}:5432"
 
   # --- POSTGRESQL DE DESENVOLVIMENTO ---
   app-upkids-db-dev:
@@ -38,5 +47,7 @@ services:
       - "${DB_DEV_PORT_EXTERNAL}:5432"
 
 volumes:
+  pg_prod_data:
+    name: ${PROJECT_NAME}-prod-vol
   pg_dev_data:
     name: ${PROJECT_NAME}-dev-vol
