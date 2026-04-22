@@ -77,10 +77,19 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <motion.p initial={{ shake: 10 }} animate={{ x: [-2, 2, -2, 2, 0] }} className="text-red-500 text-sm font-black text-center bg-red-50 p-2 rounded-lg">
-              {error}
-            </motion.p>
-          )}
+  <motion.p 
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ 
+      opacity: 1, 
+      scale: 1,
+      x: [-4, 4, -4, 4, 0] // Efeito de tremer no eixo X
+    }}
+    transition={{ duration: 0.4 }}
+    className="text-red-500 text-sm font-black text-center bg-red-50 p-2 rounded-lg"
+  >
+    {error}
+  </motion.p>
+)}
 
           <motion.button
             whileHover={{ scale: 1.05 }}
