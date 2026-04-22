@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // ou mysql/sqlite conforme seu host
+  url      = env("DATABASE_URL")
+}
+
+model Family {
+  id    String @id @default(cuid())
+  name  String
+  users User[]
+  tasks Task[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String
+  role          String   @default("FILHO") // PAI ou FILHO
+  familyId      String
+  family        Family   @relation(fields: [familyId], references: [id])
+  tasksAssigned Task[]   @relation("AssignedTo")
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  description String
+  points      Int
+  diasSemana  String?
+  familyId    String
+  userId      String
+  family      Family   @relation(fields: [familyId], references: [id])
+  assignedTo  User     @relation("AssignedTo", fields: [userId], references: [id])
+  executions  TaskExecution[]
+  createdAt   DateTime @default(now())
+}
+
+model TaskExecution {
+  id     String   @id @default(cuid())
+  taskId String
+  date   DateTime
+  task   Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, date])
+}
