@@ -5,6 +5,8 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+export const dynamic = "force-dynamic";
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
