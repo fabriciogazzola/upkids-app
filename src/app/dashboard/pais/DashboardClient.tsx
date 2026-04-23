@@ -59,7 +59,7 @@ export default function DashboardClient({
             className="bg-purple-500 p-6 rounded-[32px] text-white shadow-lg flex flex-col items-center gap-2 border-b-4 border-purple-700 active:translate-y-1 transition-all"
           >
             <Calendar size={28} />
-            <span className="font-black text-xs uppercase tracking-widest">Mensal</span>
+            <span className="font-black text-xs uppercase tracking-widest">Extrato</span>
           </motion.button>
         </section>
 
