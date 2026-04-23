@@ -8,7 +8,6 @@ import { Trophy, PlusCircle, Calendar, LogOut } from "lucide-react";
 import ModalNovaTarefa from "@/components/ModalNovaTarefa";
 import TabelaMissoes from "./TabelaMissoes";
 
-// Adicionada a prop progressoDia na desestruturação
 export default function DashboardClient({ 
   herois, 
   tarefas, 
@@ -47,16 +46,21 @@ export default function DashboardClient({
           <motion.button 
             whileTap={{ scale: 0.95 }}
             onClick={() => setIsModalOpen(true)}
-            className="bg-green-500 p-6 rounded-[32px] text-white shadow-lg flex flex-col items-center gap-2 border-b-4 border-green-700"
+            className="bg-green-500 p-6 rounded-[32px] text-white shadow-lg flex flex-col items-center gap-2 border-b-4 border-green-700 active:translate-y-1 transition-all"
           >
             <PlusCircle size={28} />
             <span className="font-black text-xs uppercase tracking-widest">Nova Missão</span>
           </motion.button>
           
-          <button className="bg-purple-500 p-6 rounded-[32px] text-white shadow-lg flex flex-col items-center gap-2 border-b-4 border-purple-700 opacity-50">
+          {/* BOTÃO MENSAL AJUSTADO: Removida opacidade e adicionado clique */}
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push('/dashboard/pais/mensal')}
+            className="bg-purple-500 p-6 rounded-[32px] text-white shadow-lg flex flex-col items-center gap-2 border-b-4 border-purple-700 active:translate-y-1 transition-all"
+          >
             <Calendar size={28} />
             <span className="font-black text-xs uppercase tracking-widest">Mensal</span>
-          </button>
+          </motion.button>
         </section>
 
         {activeTab === "placar" ? (
@@ -85,7 +89,7 @@ export default function DashboardClient({
               tarefas={tarefas} 
               dataAtual={dataContexto} 
               viewingUserId={viewingUserId} 
-              progressoDia={progressoDia} // Passando os dados do dia para a tabela
+              progressoDia={progressoDia}
             />
           </div>
         )}
