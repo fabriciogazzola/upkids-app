@@ -7,48 +7,34 @@ async function main() {
   const saltRounds = 10;
   const hashedPass = await bcrypt.hash("1455", saltRounds);
 
-  // 1. Limpar o banco de dados (Cuidado: isto apaga tudo!)
+  console.log("🧹 Limpando banco de dados...");
   await prisma.taskExecution.deleteMany({});
   await prisma.task.deleteMany({});
   await prisma.user.deleteMany({});
   await prisma.family.deleteMany({});
 
-  // 2. Criar a Família Gazzola
+  // 1. Criar a Família
   const familia = await prisma.family.create({
-    data: {
-      name: "Família Gazzola",
-    },
+    data: { name: "Família Gazzola" },
   })
 
-  // 3. Criar os Pais (Usando a senha criptografada para o NextAuth funcionar)
-  const pai = await prisma.user.create({
-    data: {
-      name: "Fabricio",
-      email: "fabricio.gazzola@gmail.com",
-      role: "PAI", // String pura
-      password: hashedPass,
-      familyId: familia.id,
-    },
+  // 2. Criar os Pais
+  await prisma.user.createMany({
+    data: [
+      { name: "Fabricio", email: "fabricio.gazzola@gmail.com", role: "PAI", password: hashedPass, familyId: familia.id },
+      { name: "Danieli", email: "danifsc@yahoo.com.br", role: "PAI", password: hashedPass, familyId: familia.id },
+    ]
   })
 
-  const mae = await prisma.user.create({
-    data: {
-      name: "Danieli",
-      email: "danifsc@yahoo.com.br",
-      role: "PAI",
-      password: hashedPass,
-      familyId: familia.id,
-    },
-  })
-
-  // 4. Criar os Filhos
+  // 3. Criar os Filhos (criamos individualmente para capturar os IDs)
   const pedro = await prisma.user.create({
     data: {
       name: "Pedro",
       email: "pedro@email.com",
       role: "FILHO",
-      password: hashedPass, // Também precisam de senha para login futuro
+      password: hashedPass,
       familyId: familia.id,
+      weeklyAllowance: 50.00 // Definindo uma mesada inicial
     },
   })
 
@@ -59,21 +45,43 @@ async function main() {
       role: "FILHO",
       password: hashedPass,
       familyId: familia.id,
+      weeklyAllowance: 40.00
     },
   })
 
-  // 5. Criar Tarefas Iniciais
-  await prisma.task.createMany({
-    data: [
-      { description: "Acordar no horário", points: 10, userId: pedro.id, familyId: familia.id },
-      { description: "Arrumar a cama", points: 15, userId: pedro.id, familyId: familia.id },
-      { description: "Escovar os dentes", points: 10, userId: pedro.id, familyId: familia.id },
-      { description: "Bónus Calma - 0 Brigas", points: 20, userId: pedro.id, familyId: familia.id },
-    ]
-  })
+  // 4. Lista de missões para os heróis
+  const missoes = [
+    { description: "Acordar no horário e arrumar a cama", points: 10, period: "MANHA" },
+    { description: "Escovar os dentes e se vestir", points: 5, period: "MANHA" },
+    { description: "Almoçar tudo (sem enrolar)", points: 10, period: "TARDE" },
+    { description: "Fazer o dever de casa", points: 20, period: "TARDE" },
+    { description: "Guardar os brinquedos", points: 15, period: "NOITE" },
+    { description: "Banho e pijama", points: 10, period: "NOITE" },
+  ]
 
-  console.log("✅ Banco de dados populado com sucesso!")
-  console.log(`👨‍👩‍👦 Família criada: ${familia.name}`)
+  console.log("🚀 Criando missões e vinculando aos heróis...");
+
+  for (const m of missoes) {
+    await prisma.task.create({
+      data: {
+        description: m.description,
+        points: m.points,
+        period: m.period,
+        familyId: familia.id,
+        diasSemana: "1,2,3,4,5,6,0", // Todos os dias da semana
+        assignedTo: {
+          connect: [
+            { id: pedro.id },
+            { id: gabriel.id }
+          ]
+        }
+      }
+    })
+  }
+
+  console.log("✅ Banco de dados populado com sucesso!");
+  console.log(`👨‍👩‍👦 Família: ${familia.name}`);
+  console.log(`👦 Heróis prontos: Pedro e Gabriel`);
 }
 
 main()

@@ -1,6 +1,6 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "@/lib/prisma"; // Use a instância centralizada
+import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export const dynamic = "force-dynamic";
@@ -26,13 +26,12 @@ export const authOptions: NextAuthOptions = {
 
         if (!isPasswordValid) return null;
 
-        // IMPORTANTE: Retornar o familyId aqui para ele entrar no JWT
         return {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
-          familyId: user.familyId, // Adicionado
+          familyId: user.familyId,
         };
       }
     })
@@ -40,7 +39,6 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        // Passa os dados do 'user' (retornado no authorize) para o 'token'
         token.role = (user as any).role;
         token.familyId = (user as any).familyId;
         token.id = user.id;
@@ -49,16 +47,30 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }: any) {
       if (session.user) {
-        // Passa os dados do 'token' para a 'session' acessível no front e nas actions
         session.user.role = token.role;
         session.user.familyId = token.familyId;
         session.user.id = token.id;
       }
       return session;
+    },
+    // ADICIONADO: Força o redirecionamento para o login em logouts
+    async redirect({ url, baseUrl }) {
+      // Se a URL contém o comando de signout, manda para /login
+      if (url.includes("signout")) return `${baseUrl}/login`;
+      
+      // Permite redirecionamentos relativos (dentro do seu site)
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      
+      // Permite redirecionamentos para a mesma origem (IP ou domínio)
+      else if (new URL(url).origin === baseUrl) return url;
+      
+      return baseUrl;
     }
   },
   pages: {
     signIn: "/login",
+    signOut: "/login", // ADICIONADO: Define a página de logout
+    error: "/login",
   },
   session: {
     strategy: "jwt"

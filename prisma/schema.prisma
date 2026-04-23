@@ -38,6 +38,7 @@ model Task {
   diasSemana  String?  // Ex: "1,2,3" (Seg, Ter, Qua)
   familyId    String
   family      Family   @relation(fields: [familyId], references: [id])
+  period      String   @default("MANHA") // "MANHA", "TARDE" ou "NOITE"
   
   // Alterado para permitir múltiplos heróis na mesma tarefa
   assignedTo  User[]   @relation("TaskToUser")

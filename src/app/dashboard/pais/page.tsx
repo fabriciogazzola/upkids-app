@@ -3,6 +3,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import DashboardClient from "./DashboardClient";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek } from "date-fns";
 
 export default async function DashboardPais({
   searchParams,
@@ -11,40 +12,28 @@ export default async function DashboardPais({
 }) {
   const session = await getServerSession(authOptions);
 
-  // 1. Proteção de Rota Inteligente
-  if (!session) {
-    redirect("/login");
-  }
-
-  if (session.user.role === "FILHO") {
-    redirect("/dashboard/filho");
-  }
-
-  if (!session.user.familyId) {
-    redirect("/login");
-  }
+  if (!session) redirect("/login");
+  if (session.user.role === "FILHO") redirect("/dashboard/filho");
+  if (!session.user.familyId) redirect("/login");
 
   const { date, userId } = await searchParams;
   const familyId = session.user.familyId;
 
-  // 2. Tratamento da Data e Cálculo da Semana (Segunda a Domingo)
+  // 1. Tratamento da Data e Intervalos
   const dataString = date || new Date().toISOString().split('T')[0];
   const dataFoco = new Date(`${dataString}T12:00:00`);
-  
-  const diaDaSemana = dataFoco.getDay(); // 0 (Dom) a 6 (Sab)
-  const diffParaSegunda = diaDaSemana === 0 ? -6 : 1 - diaDaSemana;
-  
-  const inicioSemana = new Date(dataFoco);
-  inicioSemana.setDate(dataFoco.getDate() + diffParaSegunda);
-  inicioSemana.setHours(0, 0, 0, 0);
+  const diaDaSemana = dataFoco.getDay();
 
-  const fimSemana = new Date(inicioSemana);
-  fimSemana.setDate(inicioSemana.getDate() + 6);
-  fimSemana.setHours(23, 59, 59, 999);
+  // Para a lista diária
+  const inicioDia = startOfDay(dataFoco);
+  const fimDia = endOfDay(dataFoco);
 
-  // 3. Busca de Dados no Prisma
+  // Para o placar semanal (Segunda a Domingo)
+  const inicioSemana = startOfWeek(dataFoco, { weekStartsOn: 1 });
+  const fimSemana = endOfWeek(dataFoco, { weekStartsOn: 1 });
+
+  // 2. Busca de Dados no Prisma
   const [filhosNoBanco, tarefasNoBanco] = await Promise.all([
-    // Busca todos os filhos + Tarefas Atribuídas para o placar semanal
     prisma.user.findMany({
       where: { familyId, role: "FILHO" },
       include: { 
@@ -55,35 +44,29 @@ export default async function DashboardPais({
         } 
       },
     }),
-    // Busca tarefas do dia selecionado para a lista e progresso diário
     prisma.task.findMany({
       where: { 
         familyId,
         diasSemana: { contains: diaDaSemana.toString() },
-        // Se houver userId, filtra as tarefas para a visão específica, 
-        // caso contrário traz todas da família para o contexto geral
         ...(userId ? { assignedTo: { some: { id: userId } } } : {})
       },
       include: { 
         assignedTo: true, 
         executions: {
-          where: { 
-            date: {
-              gte: new Date(`${dataString}T00:00:00Z`),
-              lte: new Date(`${dataString}T23:59:59Z`)
-            }
-          }
+          where: { date: { gte: inicioDia, lte: fimDia } }
         }
       },
       orderBy: { createdAt: 'desc' },
     })
   ]);
 
-  // 4. Formatação do Placar Semanal (Heróis)
+  // 3. Formatação do Placar Dinâmico (Heróis)
   const herois = filhosNoBanco.map((f) => {
+    // Pontos ganhos na semana atual
     const pontosGanhos = f.executions.reduce((acc, exec) => acc + (exec.task?.points || 0), 0);
 
-    const totalPossivel = f.tasksAssigned.reduce((acc, tarefa) => {
+    // TOTAL POSSÍVEL: Soma (pontos da tarefa * dias que ela aparece na semana)
+    const totalPossivelSemana = f.tasksAssigned.reduce((acc, tarefa) => {
       const diasArray = tarefa.diasSemana ? tarefa.diasSemana.split(",") : [];
       return acc + (tarefa.points * diasArray.length);
     }, 0);
@@ -92,36 +75,28 @@ export default async function DashboardPais({
       id: f.id,
       nome: f.name,
       pontos: pontosGanhos,
-      totalSemana: totalPossivel || 100, 
+      // Se não houver tarefas, usamos 1 como fallback para não quebrar a barra de progresso (divisão por zero)
+      totalSemana: totalPossivelSemana || 10, 
     };
   });
 
-  // 5. Formatação das Tarefas para o Cliente
+  // 4. Formatação das Tarefas para o Cliente
   const tarefasTratadas = tarefasNoBanco.map((t) => ({
     id: t.id,
     description: t.description,
     points: t.points,
+    period: t.period, 
     diasSemana: t.diasSemana,
     assignedTo: t.assignedTo || [], 
     concluintesIds: t.executions.map(e => e.userId),
   }));
 
-  // 6. Cálculo do Progresso do Dia (Baseado no Herói selecionado)
-  const pontosRealizadosHoje = tarefasNoBanco.reduce((acc, t) => {
-    if (userId && t.executions.some(e => e.userId === userId)) {
-      return acc + t.points;
-    }
-    return acc;
-  }, 0);
+  // 5. Progresso do Dia (apenas o herói selecionado ou geral)
+  const totalPossivelHoje = tarefasNoBanco.length;
+  const realizadoHoje = tarefasNoBanco.filter(t => 
+    userId ? t.executions.some(e => e.userId === userId) : t.executions.length > 0
+  ).length;
 
-  const totalPossivelHoje = tarefasNoBanco.reduce((acc, t) => {
-    if (userId && t.assignedTo.some(f => f.id === userId)) {
-      return acc + t.points;
-    }
-    return acc;
-  }, 0);
-
-  // 7. Retorno para o Componente de Cliente
   return (
     <DashboardClient 
       herois={herois} 
@@ -130,8 +105,9 @@ export default async function DashboardPais({
       familyId={familyId}
       filhosBase={filhosNoBanco.map(f => ({ id: f.id, nome: f.name }))}
       userName={session.user.name}
+      viewingUserId={userId}
       progressoDia={{
-        realizado: pontosRealizadosHoje,
+        realizado: realizadoHoje,
         total: totalPossivelHoje
       }}
     />
