@@ -14,10 +14,33 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = await signIn("credentials", { email, password, redirect: false });
-    if (result?.error) setError("Ops! Email ou senha errados. Tente de novo! ✌️");
-    else {
-      router.push("/dashboard/pais");
+    setError(""); // Limpa erro anterior
+
+    // 1. Tenta fazer o login sem redirecionar automaticamente
+    const result = await signIn("credentials", { 
+      email, 
+      password, 
+      redirect: false 
+    });
+
+    if (result?.error) {
+      setError("Ops! Email ou senha errados. Tente de novo! ✌️");
+    } else {
+      // 2. Se o login deu certo, buscamos os dados da sessão 
+      // para saber se é PAI ou FILHO
+      const res = await fetch("/api/auth/session");
+      const session = await res.json();
+
+      // 3. Redirecionamento baseado na ROLE definida no NextAuth
+      if (session?.user?.role === "PAI") {
+        router.push("/dashboard/pais");
+      } else if (session?.user?.role === "FILHO") {
+        router.push("/dashboard/filho");
+      } else {
+        // Fallback caso algo dê errado
+        router.push("/");
+      }
+      
       router.refresh();
     }
   };

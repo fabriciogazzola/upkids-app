@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // ou mysql/sqlite conforme seu host
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -22,27 +22,38 @@ model User {
   role          String   @default("FILHO") // PAI ou FILHO
   familyId      String
   family        Family   @relation(fields: [familyId], references: [id])
-  tasksAssigned Task[]   @relation("AssignedTo")
+  
+  // Alterado para permitir que um usuário tenha muitas tarefas
+  tasksAssigned Task[]   @relation("TaskToUser")
+  
+  // Execuções específicas deste usuário (Importante para o Placar)
+  executions    TaskExecution[]
 }
 
 model Task {
   id          String   @id @default(cuid())
   description String
   points      Int
-  diasSemana  String?
+  diasSemana  String?  // Ex: "1,2,3" (Seg, Ter, Qua)
   familyId    String
-  userId      String
   family      Family   @relation(fields: [familyId], references: [id])
-  assignedTo  User     @relation("AssignedTo", fields: [userId], references: [id])
+  
+  // Alterado para permitir múltiplos heróis na mesma tarefa
+  assignedTo  User[]   @relation("TaskToUser")
+  
   executions  TaskExecution[]
   createdAt   DateTime @default(now())
 }
 
 model TaskExecution {
-  id     String   @id @default(cuid())
-  taskId String
-  date   DateTime
-  task   Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String   // Adicionado: Quem completou a tarefa
+  date      DateTime // Data da conclusão (meio-dia T12:00:00Z)
+  
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([taskId, date])
+  // O check é único por tarefa, usuário e dia
+  @@unique([taskId, userId, date])
 }

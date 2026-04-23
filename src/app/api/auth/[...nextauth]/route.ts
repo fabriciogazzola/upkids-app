@@ -1,9 +1,7 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma"; // Use a instância centralizada
 import bcrypt from "bcryptjs";
-
-const prisma = new PrismaClient();
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +26,13 @@ export const authOptions: NextAuthOptions = {
 
         if (!isPasswordValid) return null;
 
+        // IMPORTANTE: Retornar o familyId aqui para ele entrar no JWT
         return {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role, // Adicionamos o papel (PAI/FILHO)
+          role: user.role,
+          familyId: user.familyId, // Adicionado
         };
       }
     })
@@ -40,19 +40,28 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        // Passa os dados do 'user' (retornado no authorize) para o 'token'
         token.role = (user as any).role;
+        token.familyId = (user as any).familyId;
+        token.id = user.id;
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
-        (session.user as any).role = token.role;
+        // Passa os dados do 'token' para a 'session' acessível no front e nas actions
+        session.user.role = token.role;
+        session.user.familyId = token.familyId;
+        session.user.id = token.id;
       }
       return session;
     }
   },
   pages: {
     signIn: "/login",
+  },
+  session: {
+    strategy: "jwt"
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
