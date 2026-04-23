@@ -1,34 +1,52 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, TrendingUp, CheckCircle2, XCircle, Calendar } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Calendar, DollarSign, Wallet, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
-
-interface ExtratoItem {
-  id: string;
-  description: string;
-  points: number;
-  date: Date;
-  status: 'CONCLUIDO' | 'NAO_FEITO';
-}
+import { updateWeeklyAllowance } from "@/app/actions/userActions";
 
 export default function ExtratoMensalClient({ 
   filhos, 
   extrato, 
   userIdAtivo, 
+  mesadaSalva, 
   mesNome 
 }: any) {
   const router = useRouter();
+  
+  const [valorMesada, setValorMesada] = useState(mesadaSalva || 0);
+  const [salvando, setSalvando] = useState(false);
 
-  // Cálculo do total de pontos (apenas o que foi concluído)
-  const totalPontosMes = Object.values(extrato).flat()
-    .filter((i: any) => i.status === 'CONCLUIDO')
-    .reduce((acc: number, curr: any) => acc + curr.points, 0);
+  useEffect(() => {
+    setValorMesada(mesadaSalva);
+  }, [mesadaSalva, userIdAtivo]);
+
+  const handleSalvarMesada = async () => {
+    try {
+      setSalvando(true);
+      await updateWeeklyAllowance(userIdAtivo, valorMesada);
+      router.refresh();
+    } catch (error) {
+      alert("Erro ao salvar o valor da mesada.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const calcularResumoSemana = (tarefasSemana: any[]) => {
+    const ganho = tarefasSemana.filter(t => t.status === 'CONCLUIDO').reduce((acc, t) => acc + t.points, 0);
+    const possivel = tarefasSemana.reduce((acc, t) => acc + t.points, 0);
+    const aproveitamento = possivel > 0 ? ganho / possivel : 0;
+    const valorParaPagar = aproveitamento * valorMesada;
+
+    return { ganho, possivel, aproveitamento, valorParaPagar };
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 pb-24 font-sans">
       
-      {/* HEADER E VOLTAR */}
+      {/* HEADER */}
       <div className="max-w-3xl mx-auto flex items-center justify-between mb-8">
         <button 
           onClick={() => router.push('/dashboard/pais')}
@@ -36,102 +54,137 @@ export default function ExtratoMensalClient({
         >
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic flex items-center gap-2">
+        <h1 suppressHydrationWarning className="text-xl font-black text-slate-800 uppercase tracking-tighter italic flex items-center gap-2">
           <Calendar className="text-blue-600" size={20} /> Extrato de {mesNome}
         </h1>
         <div className="w-12" /> 
       </div>
 
-      <div className="max-w-3xl mx-auto space-y-8">
+      <div className="max-w-3xl mx-auto space-y-6">
         
-        {/* SELETOR DE FILHOS (O QUE ESTAVA FALTANDO) */}
-        <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
-          {filhos.map((filho: any) => (
+        {/* SELETOR DE FILHOS */}
+        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+          {filhos.map((f: any) => (
             <button
-              key={filho.id}
-              onClick={() => router.push(`/dashboard/pais/mensal?userId=${filho.id}`)}
-              className={`px-8 py-4 rounded-[24px] font-black text-xs uppercase transition-all whitespace-nowrap shadow-sm border-2 ${
-                userIdAtivo === filho.id 
-                  ? 'bg-blue-600 text-white border-blue-600 scale-105 shadow-blue-200' 
-                  : 'bg-white text-slate-400 border-white hover:border-blue-200'
+              key={f.id}
+              onClick={() => router.push(`/dashboard/pais/mensal?userId=${f.id}`)}
+              className={`px-6 py-3 rounded-2xl font-black text-xs uppercase transition-all whitespace-nowrap border-2 ${
+                userIdAtivo === f.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-white'
               }`}
             >
-              {filho.name}
+              {f.name}
             </button>
           ))}
         </div>
 
-        {/* CARD DE RESUMO MENSAL */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-[40px] text-white shadow-2xl relative overflow-hidden"
-        >
-          <TrendingUp className="absolute right-[-5%] top-[-10%] opacity-10" size={180} />
-          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mb-2">Saldo total do mês</p>
-          <h2 className="text-6xl font-black tracking-tighter">
-            {totalPontosMes} <span className="text-2xl text-yellow-400">pts</span>
-          </h2>
-        </motion.div>
+        {/* CONFIGURAÇÃO DA MESADA */}
+        <section className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center justify-between group">
+          <div className="flex items-center gap-3">
+            <div className="bg-green-100 text-green-600 p-3 rounded-2xl">
+              <DollarSign size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Mesada Semanal (Meta 100%)</p>
+              <div className="flex items-center gap-2 font-black text-2xl text-slate-800">
+                <span className="text-slate-300">R$</span>
+                <input 
+                  type="number" 
+                  value={valorMesada}
+                  onChange={(e) => setValorMesada(Number(e.target.value))}
+                  className="w-24 outline-none text-blue-600 focus:bg-blue-50 rounded-lg px-1 transition-all"
+                />
+                <button 
+                  onClick={handleSalvarMesada}
+                  disabled={salvando || valorMesada === mesadaSalva}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                    valorMesada !== mesadaSalva 
+                    ? 'bg-blue-600 text-white shadow-md active:scale-95' 
+                    : 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                  }`}
+                >
+                  <Save size={14} />
+                  {salvando ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+          <Wallet className="hidden md:block text-slate-100 group-hover:text-slate-200 transition-colors" size={48} />
+        </section>
 
         {/* LISTAGEM POR SEMANAS */}
-        <div className="space-y-10">
-          {Object.keys(extrato).sort((a, b) => Number(b) - Number(a)).map((semana) => (
-            <section key={semana}>
-              <div className="flex items-center gap-4 mb-6">
-                <div className="bg-white border border-slate-200 text-slate-500 px-4 py-1.5 rounded-full font-black text-[10px] uppercase shadow-sm">
-                  Semana {semana}
+        <div className="space-y-12">
+          {Object.keys(extrato).map((labelSemana) => {
+            const resumo = calcularResumoSemana(extrato[labelSemana]);
+            if (extrato[labelSemana].length === 0) return null;
+
+            // --- AJUSTE DO TÍTULO DA SEMANA ---
+            const dataInicio = new Date(Number(labelSemana));
+            const dataFim = new Date(dataInicio.getTime() + 6 * 24 * 60 * 60 * 1000); // +6 dias para o domingo
+            
+            const formatarDataLocal = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+            return (
+              <section key={labelSemana} className="space-y-4">
+                <div className="flex items-end justify-between px-2">
+                  <div>
+                    <h3 suppressHydrationWarning className="font-black text-slate-800 uppercase tracking-tighter text-lg leading-tight">
+                      Semana {formatarDataLocal(dataInicio)} a {formatarDataLocal(dataFim)}
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      Aproveitamento: {Math.round(resumo.aproveitamento * 100)}%
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest leading-none mb-1 text-right">Valor Conquistado</p>
+                    <p className="text-2xl font-black text-green-600 leading-none tracking-tighter">
+                      R$ {resumo.valorParaPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 h-[2px] bg-slate-200/50" />
-              </div>
 
-              <div className="space-y-3">
-                {extrato[semana].map((item: any) => {
-                  const isConcluido = item.status === 'CONCLUIDO';
+                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden mb-4">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${resumo.aproveitamento * 100}%` }}
+                    className={`h-full ${resumo.aproveitamento >= 1 ? 'bg-green-500' : 'bg-blue-500'}`}
+                  />
+                </div>
 
-                  return (
-                    <motion.div 
-                      key={item.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className={`p-5 rounded-[32px] border flex items-center justify-between transition-all bg-white ${
-                        isConcluido ? 'border-slate-100 shadow-sm' : 'border-red-100 bg-red-50/20'
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-2xl ${
-                          isConcluido ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-500'
-                        }`}>
-                          {isConcluido ? <CheckCircle2 size={22} /> : <XCircle size={22} />}
+                <div className="space-y-3">
+                  {extrato[labelSemana].map((item: any) => {
+                    const isConcluido = item.status === 'CONCLUIDO';
+                    return (
+                      <div 
+                        key={item.id}
+                        className={`p-4 rounded-[24px] border flex items-center justify-between bg-white transition-all ${
+                          isConcluido ? 'border-slate-50 shadow-sm' : 'border-red-50 bg-red-50/10'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-xl ${isConcluido ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-400'}`}>
+                            {isConcluido ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                          </div>
+                          <div>
+                            <p className={`font-black text-[12px] uppercase tracking-tight leading-tight ${isConcluido ? 'text-slate-700' : 'text-red-900/60'}`}>
+                              {item.description}
+                            </p>
+                            <p suppressHydrationWarning className="text-[9px] font-bold text-slate-400 uppercase">
+                              {new Date(item.date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' })}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className={`font-black text-sm uppercase tracking-tight ${
-                            isConcluido ? 'text-slate-700' : 'text-red-900'
-                          }`}>
-                            {item.description}
-                          </p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase">
-                            {new Date(item.date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' })}
+                        <div className="text-right">
+                          <p className={`font-black text-sm ${isConcluido ? 'text-blue-600' : 'text-red-300 line-through'}`}>
+                            {item.points} pts
                           </p>
                         </div>
                       </div>
-
-                      <div className="text-right">
-                        <p className={`font-black text-xl ${
-                          isConcluido ? 'text-green-600' : 'text-red-400'
-                        }`}>
-                          {isConcluido ? `+${item.points}` : '0'}
-                        </p>
-                        {!isConcluido && (
-                          <span className="text-[8px] font-black text-red-400 uppercase block">Pendente</span>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
         </div>
       </div>
     </div>
