@@ -30,6 +30,7 @@ export default function ModalNovaTarefa({ filhos, familyId, onClose }: any) {
       pontos: Number(pontos),
       filhosIds: selecionados,
       diasSemana: dias.join(","),
+      periodo: period,
       familyId
     });
     setLoading(false);

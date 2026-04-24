@@ -13,10 +13,10 @@ export async function criarTarefaAction(data: {
   descricao: string;
   pontos: number;
   filhosIds: string[];
-  diasSemana: string; // Ex: "1,2,3"
+  diasSemana: string; 
+  periodo: string; // <--- ADICIONADO AQUI
 }) {
   try {
-    // 1. Pega a sessão no servidor para garantir o familyId correto
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.familyId) {
@@ -24,12 +24,13 @@ export async function criarTarefaAction(data: {
       return { error: "Não autorizado" };
     }
 
-    // 2. Cria a tarefa no Prisma
+    // Cria a tarefa no Prisma
     await prisma.task.create({
       data: {
         description: data.descricao,
         points: data.pontos,
         diasSemana: data.diasSemana,
+        period: data.periodo, // <--- ADICIONADO PARA SALVAR NO BANCO
         family: {
           connect: { id: session.user.familyId }
         },
@@ -61,7 +62,6 @@ export async function toggleTarefaAction(
 
   try {
     if (status) {
-      // Adiciona a execução (Marcar como feito)
       await prisma.taskExecution.upsert({
         where: { 
           taskId_userId_date: { 
@@ -78,7 +78,6 @@ export async function toggleTarefaAction(
         },
       });
     } else {
-      // Remove a execução (Desmarcar)
       await prisma.taskExecution.deleteMany({
         where: { 
           taskId, 
@@ -95,6 +94,7 @@ export async function toggleTarefaAction(
     return { error: "Erro ao atualizar status da tarefa" };
   }
 }
+
 /**
  * Deleta uma tarefa permanentemente.
  */
@@ -106,12 +106,10 @@ export async function deletarTarefaAction(taskId: string) {
       return { error: "Não autorizado" };
     }
 
-    // Deleta a tarefa. O Prisma cuidará de deletar as TaskExecutions associadas
-    // devido à configuração 'onDelete: Cascade' no schema.
     await prisma.task.delete({
       where: { 
         id: taskId,
-        familyId: session.user.familyId // Segurança extra: garante que é da família
+        familyId: session.user.familyId 
       },
     });
     
