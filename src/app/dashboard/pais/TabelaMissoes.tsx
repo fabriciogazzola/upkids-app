@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 export default function TabelaMissoes({ tarefas = [], dataAtual, viewingUserId, progressoDia }: any) {
   const router = useRouter();
-  const diasAbreviados = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"];
+ const diasAbreviados = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
   
   // Garantir que a data seja tratada corretamente sem bugs de fuso horário local
   const dataRef = new Date(dataAtual + "T12:00:00");

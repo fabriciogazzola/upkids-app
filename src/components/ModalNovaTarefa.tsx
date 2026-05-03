@@ -14,10 +14,10 @@ export default function ModalNovaTarefa({ filhos, familyId, onClose }: any) {
   
   const [period, setPeriod] = useState("MANHA");
 
-  const diasMapa = [
-    { id: 1, label: "SEG" }, { id: 2, label: "TER" }, { id: 3, label: "QUA" },
-    { id: 4, label: "QUI" }, { id: 5, label: "SEX" }, { id: 6, label: "SAB" }, { id: 0, label: "DOM" }
-  ];
+const diasMapa = [
+  { id: 0, label: "DOM" }, { id: 1, label: "SEG" }, { id: 2, label: "TER" },
+  { id: 3, label: "QUA" }, { id: 4, label: "QUI" }, { id: 5, label: "SEX" }, { id: 6, label: "SAB" }
+];
 
   const handleSalvar = async () => {
     if (!descricao || selecionados.length === 0 || dias.length === 0 || !pontos) {

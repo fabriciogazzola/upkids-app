@@ -53,14 +53,14 @@ export default function DashboardClient({
           </motion.button>
           
           {/* BOTÃO MENSAL AJUSTADO: Removida opacidade e adicionado clique */}
-          <motion.button 
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.push('/dashboard/pais/mensal')}
-            className="bg-purple-500 p-6 rounded-[32px] text-white shadow-lg flex flex-col items-center gap-2 border-b-4 border-purple-700 active:translate-y-1 transition-all"
-          >
-            <Calendar size={28} />
-            <span className="font-black text-xs uppercase tracking-widest">Extrato</span>
-          </motion.button>
+         <motion.button 
+  whileTap={{ scale: 0.95 }}
+  onClick={() => window.location.href = '/dashboard/pais/mensal'}
+  className="bg-purple-500 p-6 rounded-[32px] text-white shadow-lg flex flex-col items-center gap-2 border-b-4 border-purple-700 active:translate-y-1 transition-all"
+>
+  <Calendar size={28} />
+  <span className="font-black text-xs uppercase tracking-widest">Extrato</span>
+</motion.button>
         </section>
 
         {activeTab === "placar" ? (

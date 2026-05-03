@@ -1,0 +1,2564 @@
+This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching these patterns are excluded: node_modules, dist, *.log
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+prisma/
+  migrations/
+    20260423015017_initial_migration/
+      migration.sql
+    migration_lock.toml
+  schema.prisma
+  seed-tasks.ts
+  seed.ts
+public/
+  file.svg
+  globe.svg
+  next.svg
+  vercel.svg
+  window.svg
+src/
+  app/
+    actions/
+      userActions.ts
+    api/
+      auth/
+        [...nextauth]/
+          route.ts
+    dashboard/
+      filho/
+        ListaMissoesFilho.tsx
+        page.tsx
+      pais/
+        mensal/
+          ExtratoMensalClient.tsx
+          page.tsx
+        actions.ts
+        DashboardClient.tsx
+        page.tsx
+        TabelaMissoes.tsx
+    login/
+      page.tsx
+    favicon.ico
+    globals.css
+    layout.tsx
+    page.tsx
+  components/
+    ModalNovaTarefa.tsx
+    Providers.tsx
+  lib/
+    prisma.ts
+.gitignore
+docker-compose.yml
+Dockerfile
+Dockerfile.dev
+eslint.config.mjs
+next.config.ts
+package.json
+postcss.config.mjs
+README.md
+tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="prisma/migrations/20260423015017_initial_migration/migration.sql">
+-- CreateTable
+CREATE TABLE "Family" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+
+    CONSTRAINT "Family_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "User" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'FILHO',
+    "weeklyAllowance" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "familyId" TEXT NOT NULL,
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Task" (
+    "id" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "points" INTEGER NOT NULL,
+    "diasSemana" TEXT,
+    "familyId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Task_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TaskExecution" (
+    "id" TEXT NOT NULL,
+    "taskId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "date" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TaskExecution_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "_TaskToUser" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_TaskToUser_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TaskExecution_taskId_userId_date_key" ON "TaskExecution"("taskId", "userId", "date");
+
+-- CreateIndex
+CREATE INDEX "_TaskToUser_B_index" ON "_TaskToUser"("B");
+
+-- AddForeignKey
+ALTER TABLE "User" ADD CONSTRAINT "User_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "Family"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Task" ADD CONSTRAINT "Task_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "Family"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TaskExecution" ADD CONSTRAINT "TaskExecution_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TaskExecution" ADD CONSTRAINT "TaskExecution_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_TaskToUser" ADD CONSTRAINT "_TaskToUser_A_fkey" FOREIGN KEY ("A") REFERENCES "Task"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_TaskToUser" ADD CONSTRAINT "_TaskToUser_B_fkey" FOREIGN KEY ("B") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+</file>
+
+<file path="prisma/migrations/migration_lock.toml">
+# Please do not edit this file manually
+# It should be added in your version-control system (e.g., Git)
+provider = "postgresql"
+</file>
+
+<file path="prisma/seed-tasks.ts">
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log("⏳ Buscando usuários no banco...");
+
+  // Busca os usuários existentes para vincular as tarefas
+  const pedro = await prisma.user.findFirst({ where: { name: "Pedro" } });
+  const gabriel = await prisma.user.findFirst({ where: { name: "Gabriel" } });
+
+  if (!pedro || !gabriel) {
+    console.error("❌ Erro: Pedro ou Gabriel não encontrados. Rode o seed principal primeiro.");
+    return;
+  }
+
+  const familyId = pedro.familyId; // Pega o ID da família do Pedro
+
+  console.log("🧹 Removendo tarefas antigas (opcional)...");
+  await prisma.taskExecution.deleteMany({ where: { userId: { in: [pedro.id, gabriel.id] } } });
+  await prisma.task.deleteMany({ where: { familyId } });
+
+  const tarefasParaCriar = [
+    // 10 Tarefas para o Pedro
+    { description: "Organizar material escolar", points: 15, dias: "0", kids: [pedro.id] },
+    { description: "Lavar o tênis", points: 30, dias: "6", kids: [pedro.id] },
+    { description: "Praticar instrumento/estudo", points: 20, dias: "1,3,5", kids: [pedro.id] },
+    { description: "Ajudar a guardar as compras", points: 10, dias: "2,4,6", kids: [pedro.id] },
+    { description: "Tomar banho sem reclamar", points: 10, dias: "1,2,3,4,5,6,0", kids: [pedro.id] },
+    { description: "Colocar comida para o pet", points: 5, dias: "1,2,3,4,5,6,0", kids: [pedro.id] },
+    { description: "Apagar as luzes ao sair", points: 5, dias: "1,2,3,4,5,6,0", kids: [pedro.id] },
+    { description: "Arrumar a mesa do jantar", points: 10, dias: "1,2,3,4,5,6,0", kids: [pedro.id] },
+    { description: "Dormir antes das 22h", points: 20, dias: "1,2,3,4,5", kids: [pedro.id] },
+    { description: "Não gritar dentro de casa", points: 15, dias: "1,2,3,4,5,6,0", kids: [pedro.id] },
+
+    // 10 Tarefas para o Gabriel
+    { description: "Recolher brinquedos da sala", points: 15, dias: "1,2,3,4,5,6,0", kids: [gabriel.id] },
+    { description: "Comer toda a fruta", points: 10, dias: "1,2,3,4,5,6,0", kids: [gabriel.id] },
+    { description: "Guardar os sapatos no armário", points: 5, dias: "1,2,3,4,5,6,0", kids: [gabriel.id] },
+    { description: "Ajudar a regar as plantas", points: 10, dias: "2,4,0", kids: [gabriel.id] },
+    { description: "Fazer o dever de casa", points: 25, dias: "1,2,3,4,5", kids: [gabriel.id] },
+    { description: "Secar a louça (itens de plástico)", points: 10, dias: "3,5,6", kids: [gabriel.id] },
+    { description: "Limpar a mesa após o lanche", points: 10, dias: "1,2,3,4,5,6,0", kids: [gabriel.id] },
+    { description: "Colocar o pijama sozinho", points: 10, dias: "1,2,3,4,5,6,0", kids: [gabriel.id] },
+    { description: "Organizar as almofadas do sofá", points: 5, dias: "6,0", kids: [gabriel.id] },
+    { description: "Levar o lixo do banheiro", points: 15, dias: "3,6", kids: [gabriel.id] },
+  ];
+
+  console.log("📝 Injetando tarefas...");
+
+  for (const t of tarefasParaCriar) {
+    const task = await prisma.task.create({
+      data: {
+        description: t.description,
+        points: t.points,
+        diasSemana: t.dias,
+        familyId: familyId!,
+        assignedTo: { connect: t.kids.map(id => ({ id })) }
+      }
+    });
+
+    // Criar algumas execuções aleatórias para hoje (22/04/2026) e ontem (21/04/2026)
+    for (const kidId of t.kids) {
+      if (Math.random() > 0.4) {
+        await prisma.taskExecution.create({
+          data: {
+            taskId: task.id,
+            userId: kidId,
+            date: new Date("2026-04-22T12:00:00Z")
+          }
+        });
+      }
+      if (Math.random() > 0.6) {
+        await prisma.taskExecution.create({
+          data: {
+            taskId: task.id,
+            userId: kidId,
+            date: new Date("2026-04-21T12:00:00Z")
+          }
+        });
+      }
+    }
+  }
+
+  console.log("✅ Tarefas injetadas com sucesso!");
+}
+
+main()
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });
+</file>
+
+<file path="public/file.svg">
+<svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
+</file>
+
+<file path="public/globe.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
+</file>
+
+<file path="public/next.svg">
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 394 80"><path fill="#000" d="M262 0h68.5v12.7h-27.2v66.6h-13.6V12.7H262V0ZM149 0v12.7H94v20.4h44.3v12.6H94v21h55v12.6H80.5V0h68.7zm34.3 0h-17.8l63.8 79.4h17.9l-32-39.7 32-39.6h-17.9l-23 28.6-23-28.6zm18.3 56.7-9-11-27.1 33.7h17.8l18.3-22.7z"/><path fill="#000" d="M81 79.3 17 0H0v79.3h13.6V17l50.2 62.3H81Zm252.6-.4c-1 0-1.8-.4-2.5-1s-1.1-1.6-1.1-2.6.3-1.8 1-2.5 1.6-1 2.6-1 1.8.3 2.5 1a3.4 3.4 0 0 1 .6 4.3 3.7 3.7 0 0 1-3 1.8zm23.2-33.5h6v23.3c0 2.1-.4 4-1.3 5.5a9.1 9.1 0 0 1-3.8 3.5c-1.6.8-3.5 1.3-5.7 1.3-2 0-3.7-.4-5.3-1s-2.8-1.8-3.7-3.2c-.9-1.3-1.4-3-1.4-5h6c.1.8.3 1.6.7 2.2s1 1.2 1.6 1.5c.7.4 1.5.5 2.4.5 1 0 1.8-.2 2.4-.6a4 4 0 0 0 1.6-1.8c.3-.8.5-1.8.5-3V45.5zm30.9 9.1a4.4 4.4 0 0 0-2-3.3 7.5 7.5 0 0 0-4.3-1.1c-1.3 0-2.4.2-3.3.5-.9.4-1.6 1-2 1.6a3.5 3.5 0 0 0-.3 4c.3.5.7.9 1.3 1.2l1.8 1 2 .5 3.2.8c1.3.3 2.5.7 3.7 1.2a13 13 0 0 1 3.2 1.8 8.1 8.1 0 0 1 3 6.5c0 2-.5 3.7-1.5 5.1a10 10 0 0 1-4.4 3.5c-1.8.8-4.1 1.2-6.8 1.2-2.6 0-4.9-.4-6.8-1.2-2-.8-3.4-2-4.5-3.5a10 10 0 0 1-1.7-5.6h6a5 5 0 0 0 3.5 4.6c1 .4 2.2.6 3.4.6 1.3 0 2.5-.2 3.5-.6 1-.4 1.8-1 2.4-1.7a4 4 0 0 0 .8-2.4c0-.9-.2-1.6-.7-2.2a11 11 0 0 0-2.1-1.4l-3.2-1-3.8-1c-2.8-.7-5-1.7-6.6-3.2a7.2 7.2 0 0 1-2.4-5.7 8 8 0 0 1 1.7-5 10 10 0 0 1 4.3-3.5c2-.8 4-1.2 6.4-1.2 2.3 0 4.4.4 6.2 1.2 1.8.8 3.2 2 4.3 3.4 1 1.4 1.5 3 1.5 5h-5.8z"/></svg>
+</file>
+
+<file path="public/vercel.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+</file>
+
+<file path="public/window.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+</file>
+
+<file path="src/app/actions/userActions.ts">
+"use server";
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+
+export async function updateWeeklyAllowance(userId: string, value: number) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { weeklyAllowance: value },
+  });
+  revalidatePath("/dashboard/pais/mensal");
+}
+</file>
+
+<file path="src/app/globals.css">
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+</file>
+
+<file path="src/app/page.tsx">
+import Image from "next/image";
+
+export default function Home() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+        <Image
+          className="dark:invert"
+          src="/next.svg"
+          alt="Next.js logo"
+          width={100}
+          height={20}
+          priority
+        />
+        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
+          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
+            To get started, edit the page.tsx file.
+          </h1>
+          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
+            Looking for a starting point or more instructions? Head over to{" "}
+            <a
+              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+              className="font-medium text-zinc-950 dark:text-zinc-50"
+            >
+              Templates
+            </a>{" "}
+            or the{" "}
+            <a
+              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+              className="font-medium text-zinc-950 dark:text-zinc-50"
+            >
+              Learning
+            </a>{" "}
+            center.
+          </p>
+        </div>
+        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+          <a
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
+            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Image
+              className="dark:invert"
+              src="/vercel.svg"
+              alt="Vercel logomark"
+              width={16}
+              height={16}
+            />
+            Deploy Now
+          </a>
+          <a
+            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
+            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Documentation
+          </a>
+        </div>
+      </main>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/Providers.tsx">
+"use client";
+
+import { SessionProvider } from "next-auth/react";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <SessionProvider>{children}</SessionProvider>;
+}
+</file>
+
+<file path="src/lib/prisma.ts">
+import { PrismaClient } from "@prisma/client";
+
+// O PrismaClient é instanciado dessa forma para evitar que o Next.js
+// abra conexões demais com o banco de dados durante o desenvolvimento (Hot Reload).
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+</file>
+
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+</file>
+
+<file path="Dockerfile.dev">
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Necessário para o Hot Reload funcionar corretamente em sistemas Linux/Docker
+RUN apk add --no-cache libc6-compat
+
+COPY package.json package-lock.json ./
+# Instalamos todas as dependências (incluindo as de desenvolvimento)
+RUN npm install
+
+COPY . .
+
+# Variáveis para garantir que o Next.js aceite conexões externas no Docker
+ENV PORT 3002
+ENV HOSTNAME "0.0.0.0"
+ENV NODE_ENV development
+
+EXPOSE 3002
+
+# Rodando em modo desenvolvimento
+CMD ["npm", "run", "dev", "--", "-p", "3002"]
+</file>
+
+<file path="eslint.config.mjs">
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+</file>
+
+<file path="postcss.config.mjs">
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+</file>
+
+<file path="README.md">
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# upkids-app
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+</file>
+
+<file path="prisma/seed.ts">
+import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+
+const prisma = new PrismaClient()
+
+async function main() {
+  const saltRounds = 10;
+  const hashedPass = await bcrypt.hash("1455", saltRounds);
+
+  console.log("🧹 Limpando banco de dados...");
+  await prisma.taskExecution.deleteMany({});
+  await prisma.task.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.family.deleteMany({});
+
+  // 1. Criar a Família
+  const familia = await prisma.family.create({
+    data: { name: "Família Gazzola" },
+  })
+
+  // 2. Criar os Pais
+  await prisma.user.createMany({
+    data: [
+      { name: "Fabricio", email: "fabricio.gazzola@gmail.com", role: "PAI", password: hashedPass, familyId: familia.id },
+      { name: "Danieli", email: "danifsc@yahoo.com.br", role: "PAI", password: hashedPass, familyId: familia.id },
+    ]
+  })
+
+  // 3. Criar os Filhos (criamos individualmente para capturar os IDs)
+  const pedro = await prisma.user.create({
+    data: {
+      name: "Pedro",
+      email: "pedro@email.com",
+      role: "FILHO",
+      password: hashedPass,
+      familyId: familia.id,
+      weeklyAllowance: 50.00 // Definindo uma mesada inicial
+    },
+  })
+
+  const gabriel = await prisma.user.create({
+    data: {
+      name: "Gabriel",
+      email: "gabriel@email.com",
+      role: "FILHO",
+      password: hashedPass,
+      familyId: familia.id,
+      weeklyAllowance: 40.00
+    },
+  })
+
+  // 4. Lista de missões para os heróis
+  const missoes = [
+    { description: "Acordar no horário e arrumar a cama", points: 10, period: "MANHA" },
+    { description: "Escovar os dentes e se vestir", points: 5, period: "MANHA" },
+    { description: "Almoçar tudo (sem enrolar)", points: 10, period: "TARDE" },
+    { description: "Fazer o dever de casa", points: 20, period: "TARDE" },
+    { description: "Guardar os brinquedos", points: 15, period: "NOITE" },
+    { description: "Banho e pijama", points: 10, period: "NOITE" },
+  ]
+
+  console.log("🚀 Criando missões e vinculando aos heróis...");
+
+  for (const m of missoes) {
+    await prisma.task.create({
+      data: {
+        description: m.description,
+        points: m.points,
+        period: m.period,
+        familyId: familia.id,
+        diasSemana: "1,2,3,4,5,6,0", // Todos os dias da semana
+        assignedTo: {
+          connect: [
+            { id: pedro.id },
+            { id: gabriel.id }
+          ]
+        }
+      }
+    })
+  }
+
+  console.log("✅ Banco de dados populado com sucesso!");
+  console.log(`👨‍👩‍👦 Família: ${familia.name}`);
+  console.log(`👦 Heróis prontos: Pedro e Gabriel`);
+}
+
+main()
+  .catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
+</file>
+
+<file path="src/app/dashboard/filho/ListaMissoesFilho.tsx">
+"use client";
+
+import { motion } from "framer-motion";
+import { CheckCircle2, Circle, Star, Trophy, Medal, Target } from "lucide-react";
+
+export default function ListaMissoesFilho({ tarefas, nomeFilho, progressoDia, herois = [], userId }: any) {
+  const diasMapa: any = { 1: "SEG", 2: "TER", 3: "QUA", 4: "QUI", 5: "SEX", 6: "SAB", 0: "DOM" };
+  const porcentagemDia = progressoDia?.total > 0 
+    ? Math.round((progressoDia.realizado / progressoDia.total) * 100) 
+    : 0;
+
+  // Ordena heróis por pontos para o Ranking
+  const heroisOrdenados = [...herois].sort((a, b) => b.pontos - a.pontos);
+
+  return (
+    <div className="space-y-8">
+      
+      {/* SEÇÃO: RANKING COM MARCADORES DE META */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-2">
+            <Trophy className="text-yellow-500" size={20} />
+            <h3 className="font-black text-slate-800 uppercase text-[12px] tracking-widest italic">Ranking da Semana</h3>
+          </div>
+
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {heroisOrdenados.map((heroi, index) => {
+            const isMe = heroi.id === userId;
+            
+            // LÓGICA DE APROVEITAMENTO: Se atingir 85%, a barra completa 100% visualmente
+            const aproveitamentoReal = (heroi.pontos / heroi.totalSemana) * 100;
+            const porcentagemParaBarra = Math.min((aproveitamentoReal / 85) * 100, 100);
+            
+            return (
+              <motion.div
+                key={heroi.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className={`p-5 rounded-[32px] border-4 transition-all relative ${
+                  isMe 
+                  ? 'bg-white border-[#5D00FF] shadow-[0_10px_0_0_#5D00FF10]' 
+                  : 'bg-white border-slate-100 shadow-sm'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black shadow-sm ${
+                      index === 0 ? 'bg-yellow-400 text-yellow-900 rotate-3' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {index === 0 ? <Trophy size={20} /> : index + 1}
+                    </div>
+                    <div>
+                      <span className="font-black text-sm uppercase text-slate-700 block leading-none">
+                        {heroi.nome} {isMe && "⭐"}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                        {heroi.pontos} de {heroi.totalSemana} pts
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {aproveitamentoReal >= 85 && (
+                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity }}>
+                       <Target className="text-green-500" size={24} />
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* BARRA DE PROGRESSO COM MARCADORES DE META */}
+                <div className="relative pt-2 pb-6">
+                  {/* Fundo da Barra */}
+                  <div className={`w-full h-4 rounded-full overflow-hidden relative ${isMe ? 'bg-slate-100' : 'bg-slate-50'}`}>
+                    
+                    {/* Linhas das Metas (50% e 70%) baseadas na regra de 85% ser o topo */}
+                    {/* A posição é calculada como: (ValorMeta / 85) * 100 */}
+                    <div className="absolute top-0 left-[58.8%] w-0.5 h-full bg-white/50 z-10" title="Meta 50%" />
+                    <div className="absolute top-0 left-[82.3%] w-0.5 h-full bg-white/50 z-10" title="Meta 70%" />
+
+                    {/* Preenchimento Dinâmico */}
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${porcentagemParaBarra}%` }}
+                      className={`h-full transition-colors ${
+                        aproveitamentoReal >= 85 ? 'bg-green-500' : 
+                        aproveitamentoReal >= 70 ? 'bg-blue-500' : 
+                        aproveitamentoReal >= 50 ? 'bg-orange-500' : 'bg-[#5D00FF]'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Legendas dos Marcadores abaixo da barra */}
+                  <div className="absolute w-full flex justify-between mt-1 px-1">
+                    <span className="text-[8px] font-black text-slate-300">0%</span>
+                    <span className={`text-[8px] font-black absolute left-[58.8%] -translate-x-1/2 ${aproveitamentoReal >= 50 ? 'text-orange-500' : 'text-slate-300'}`}>50%</span>
+                    <span className={`text-[8px] font-black absolute left-[82.3%] -translate-x-1/2 ${aproveitamentoReal >= 70 ? 'text-blue-500' : 'text-slate-300'}`}>70%</span>
+                    <span className={`text-[8px] font-black right-0 ${aproveitamentoReal >= 85 ? 'text-green-500 font-black scale-110' : 'text-slate-300'}`}>100%</span>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Cabeçalho de Progresso do Dia */}
+      <div className="flex items-center justify-between bg-[#5D00FF] p-6 rounded-[40px] shadow-xl text-white">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-black text-purple-200 uppercase tracking-widest">Missões de Hoje</span>
+          <h2 className="text-2xl font-black uppercase tracking-tighter italic">Vamos nessa, {nomeFilho}!</h2>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+             <p className="text-2xl font-black leading-none">
+                {progressoDia?.realizado}<span className="text-purple-300 text-sm">/{progressoDia?.total}</span>
+             </p>
+             <span className="text-[9px] font-black uppercase text-purple-200">Pontos</span>
+          </div>
+          <div className="w-14 h-14 rounded-full bg-white/20 p-1">
+            <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+              <span className="text-xs font-black text-[#5D00FF]">{porcentagemDia}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Lista de Tarefas */}
+      <div className="space-y-4">
+        {tarefas.length === 0 ? (
+          <div className="bg-white p-12 rounded-[40px] border-2 border-dashed border-slate-200 text-center">
+            <p className="font-black text-slate-400 uppercase text-xs">Dia de descanso! Aproveite! 😎</p>
+          </div>
+        ) : (
+          tarefas.map((tarefa: any) => {
+            const feito = tarefa.concluido;
+            return (
+              <motion.div 
+                key={tarefa.id} 
+                className={`bg-white p-5 rounded-[32px] border-2 transition-all relative ${
+                  feito ? 'border-green-100 opacity-70 scale-[0.98]' : 'border-white shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`transition-all ${feito ? 'text-green-500' : 'text-slate-100'}`}>
+                    {feito ? <CheckCircle2 size={40} fill="#22C55E10" /> : <Circle size={40} strokeWidth={1.5} />}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className={`font-black text-slate-800 text-sm uppercase tracking-tight ${feito ? 'line-through opacity-30' : ''}`}>
+                      {tarefa.description}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-2">
+                       <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-lg font-black text-[10px]">
+                         {tarefa.points} PTS
+                       </span>
+                       {feito && <span className="text-green-600 font-black text-[10px] uppercase">Concluído!</span>}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/dashboard/filho/page.tsx">
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import ListaMissoesFilho from "./ListaMissoesFilho";
+import { startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
+
+export default async function DashboardFilho() {
+  const session = await getServerSession(authOptions);
+  
+  if (!session) redirect("/login");
+  if (session.user.role === "PAI") redirect("/dashboard/pais");
+
+  const userId = session.user.id;
+  const familyId = session.user.familyId;
+  const hoje = new Date();
+  const diaSemana = hoje.getDay().toString();
+  const dataString = hoje.toISOString().split('T')[0];
+
+  // Datas para o placar da semana (Segunda a Domingo)
+  const inicioSemana = startOfWeek(hoje, { weekStartsOn: 1 });
+  const fimSemana = endOfWeek(hoje, { weekStartsOn: 1 });
+
+  // 1. Busca de Dados: Tarefas do dia + Placar da Família
+  const [tarefasNoBanco, filhosNoBanco] = await Promise.all([
+    // Tarefas do dia do Gabriel
+    prisma.task.findMany({
+      where: {
+        assignedTo: { some: { id: userId } },
+        diasSemana: { contains: diaSemana }
+      },
+      include: {
+        executions: {
+          where: {
+            userId: userId,
+            date: {
+              gte: startOfDay(hoje),
+              lte: endOfDay(hoje)
+            }
+          }
+        }
+      }
+    }),
+    // Todos os heróis da família para o Ranking
+    prisma.user.findMany({
+      where: { familyId, role: "FILHO" },
+      include: { 
+        tasksAssigned: true, 
+        executions: {
+          where: { date: { gte: inicioSemana, lte: fimSemana } },
+          include: { task: true }
+        } 
+      },
+    })
+  ]);
+
+  // 2. Formatação das Missões do Dia
+  const tarefasTratadas = tarefasNoBanco.map(t => ({
+    id: t.id,
+    description: t.description,
+    points: t.points,
+    period: t.period,
+    diasSemana: t.diasSemana,
+    concluido: t.executions.length > 0
+  }));
+
+  // 3. Formatação do Placar da Semana (Ranking)
+  const herois = filhosNoBanco.map((f) => {
+    const pontosGanhos = f.executions.reduce((acc, exec) => acc + (exec.task?.points || 0), 0);
+    const totalPossivelSemana = f.tasksAssigned.reduce((acc, tarefa) => {
+      const diasArray = tarefa.diasSemana ? tarefa.diasSemana.split(",") : [];
+      return acc + (tarefa.points * diasArray.length);
+    }, 0);
+
+    return {
+      id: f.id,
+      nome: f.name,
+      pontos: pontosGanhos,
+      totalSemana: totalPossivelSemana || 10, 
+    };
+  });
+
+  const realizado = tarefasTratadas.filter(t => t.concluido).reduce((acc, t) => acc + t.points, 0);
+  const total = tarefasTratadas.reduce((acc, t) => acc + t.points, 0);
+
+  return (
+    <main className="min-h-screen bg-[#F8FAFC] p-4 md:p-10">
+      <div className="max-w-2xl mx-auto space-y-8">
+        
+        {/* Agora passamos os 'herois' para o componente de lista exibir o ranking */}
+        <ListaMissoesFilho 
+          tarefas={tarefasTratadas} 
+          nomeFilho={session.user.name}
+          progressoDia={{ realizado, total }}
+          herois={herois} 
+          userId={userId}
+        />
+        
+      </div>
+    </main>
+  );
+}
+</file>
+
+<file path="src/app/dashboard/pais/actions.ts">
+"use server";
+
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+/**
+ * Cria uma nova tarefa vinculada à família do usuário logado
+ * e atribuída aos filhos selecionados.
+ */
+export async function criarTarefaAction(data: {
+  descricao: string;
+  pontos: number;
+  filhosIds: string[];
+  diasSemana: string; 
+  periodo: string; // <--- ADICIONADO AQUI
+}) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.familyId) {
+      console.error("🚫 Erro: Usuário não autenticado ou sem familyId.");
+      return { error: "Não autorizado" };
+    }
+
+    // Cria a tarefa no Prisma
+    await prisma.task.create({
+      data: {
+        description: data.descricao,
+        points: data.pontos,
+        diasSemana: data.diasSemana,
+        period: data.periodo, // <--- ADICIONADO PARA SALVAR NO BANCO
+        family: {
+          connect: { id: session.user.familyId }
+        },
+        assignedTo: {
+          connect: data.filhosIds.map(id => ({ id }))
+        }
+      }
+    });
+    
+    revalidatePath("/dashboard/pais");
+    return { success: true };
+  } catch (error) {
+    console.error("❌ Erro ao criar tarefa no Prisma:", error);
+    return { error: "Erro ao criar tarefa" };
+  }
+}
+
+/**
+ * Marca ou desmarca uma tarefa como concluída para um filho específico em uma data.
+ */
+export async function toggleTarefaAction(
+  taskId: string, 
+  userId: string, 
+  dataContexto: string, 
+  status: boolean
+) {
+  // Normalizamos a data para o meio-dia UTC para evitar problemas de fuso horário
+  const dataExecucao = new Date(`${dataContexto}T12:00:00Z`);
+
+  try {
+    if (status) {
+      await prisma.taskExecution.upsert({
+        where: { 
+          taskId_userId_date: { 
+            taskId, 
+            userId, 
+            date: dataExecucao 
+          } 
+        },
+        update: {},
+        create: { 
+          taskId, 
+          userId, 
+          date: dataExecucao 
+        },
+      });
+    } else {
+      await prisma.taskExecution.deleteMany({
+        where: { 
+          taskId, 
+          userId, 
+          date: dataExecucao 
+        },
+      });
+    }
+    
+    revalidatePath("/dashboard/pais");
+    return { success: true };
+  } catch (e) {
+    console.error("❌ Erro no toggleTarefaAction:", e);
+    return { error: "Erro ao atualizar status da tarefa" };
+  }
+}
+
+/**
+ * Deleta uma tarefa permanentemente.
+ */
+export async function deletarTarefaAction(taskId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.familyId) {
+      return { error: "Não autorizado" };
+    }
+
+    await prisma.task.delete({
+      where: { 
+        id: taskId,
+        familyId: session.user.familyId 
+      },
+    });
+    
+    revalidatePath("/dashboard/pais");
+    return { success: true };
+  } catch (error) {
+    console.error("❌ Erro ao deletar tarefa:", error);
+    return { error: "Erro ao deletar tarefa" };
+  }
+}
+</file>
+
+<file path="src/app/dashboard/pais/TabelaMissoes.tsx">
+"use client";
+
+import { motion } from "framer-motion";
+import { CheckCircle2, Circle, Star, Trash2, User, ArrowLeft, Sun, CloudSun, Moon } from "lucide-react";
+import { toggleTarefaAction, deletarTarefaAction } from "./actions";
+import { useRouter } from "next/navigation";
+
+export default function TabelaMissoes({ tarefas = [], dataAtual, viewingUserId, progressoDia }: any) {
+  const router = useRouter();
+  const diasAbreviados = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"];
+  
+  // Garantir que a data seja tratada corretamente sem bugs de fuso horário local
+  const dataRef = new Date(dataAtual + "T12:00:00");
+  const diaSelecionadoIndex = dataRef.getDay();
+
+  const infoPeriodo: any = {
+    MANHA: { icon: <Sun size={12} />, label: "Manhã", color: "bg-amber-50 text-amber-600", border: "border-amber-100" },
+    TARDE: { icon: <CloudSun size={12} />, label: "Tarde", color: "bg-blue-50 text-blue-600", border: "border-blue-100" },
+    NOITE: { icon: <Moon size={12} />, label: "Noite", color: "bg-indigo-50 text-indigo-600", border: "border-indigo-100" }
+  };
+
+  const mudarDia = (diaNome: string) => {
+    const mapa: any = { "DOM": 0, "SEG": 1, "TER": 2, "QUA": 3, "QUI": 4, "SEX": 5, "SAB": 6 };
+    const alvo = mapa[diaNome];
+    const d = new Date(dataRef);
+    const diff = alvo === 0 ? (diaSelecionadoIndex === 0 ? 0 : 7 - diaSelecionadoIndex) : (alvo - diaSelecionadoIndex);
+    d.setDate(dataRef.getDate() + diff);
+    router.push(`/dashboard/pais?date=${d.toISOString().split('T')[0]}&tab=missoes&userId=${viewingUserId}`);
+  };
+
+  const handleDeletar = async (taskId: string, description: string) => {
+    if (confirm(`Tem certeza que deseja deletar a missão "${description}"?`)) {
+      await deletarTarefaAction(taskId);
+    }
+  };
+
+  const diasMapa: any = { 1: "SEG", 2: "TER", 3: "QUA", 4: "QUI", 5: "SEX", 6: "SAB", 0: "DOM" };
+
+  const porcentagemDia = progressoDia?.total > 0 
+    ? Math.round((progressoDia.realizado / progressoDia.total) * 100) 
+    : 0;
+
+  const periodosUnicos = ["MANHA", "TARDE", "NOITE"];
+
+  return (
+    <div className="space-y-6">
+      {/* Header e Placar */}
+      <div className="flex items-center justify-between gap-3">
+        <button 
+          onClick={() => router.push('/dashboard/pais')}
+          className="flex items-center gap-2 text-[#5D00FF] font-black text-[15px] uppercase bg-white px-5 py-3 rounded-full shadow-sm border border-slate-100 active:scale-95 transition-all"
+        >
+          <ArrowLeft size={14} /> Voltar
+        </button>
+
+        <div className="bg-white pl-4 pr-2 py-1.5 rounded-full shadow-sm border border-slate-50 flex items-center gap-3">
+          <div className="flex flex-col items-end">
+            <span className="text-xl font-black text-slate-800 leading-none mt-1">
+              {progressoDia?.realizado}<span className="text-slate-300 text-[20px]">/{progressoDia?.total}</span>
+            </span>
+          </div>
+          <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center border-2 border-white shadow-sm">
+             <span className="text-[15px] font-black text-blue-600">
+               {porcentagemDia}%
+             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Régua de Dias */}
+      <div className="flex justify-between bg-white p-2 rounded-2xl shadow-sm border border-slate-100 overflow-x-auto no-scrollbar gap-1">
+        {diasAbreviados.map((dia) => {
+          const mapaDias: any = { "DOM": 0, "SEG": 1, "TER": 2, "QUA": 3, "QUI": 4, "SEX": 5, "SAB": 6 };
+          const isAtivo = mapaDias[dia] === diaSelecionadoIndex;
+          return (
+            <button
+              key={dia}
+              onClick={() => mudarDia(dia)}
+              className={`flex-1 min-w-[42px] py-3 rounded-xl font-black text-[10px] transition-all ${
+                isAtivo ? 'bg-yellow-400 text-yellow-900 shadow-sm' : 'text-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              {dia}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Listagem de Tarefas */}
+      <div className="space-y-8">
+        {tarefas.length === 0 ? (
+          <div className="bg-white/50 border-2 border-dashed border-slate-200 rounded-[32px] py-10 text-center">
+             <p className="font-black text-slate-400 uppercase text-[10px] tracking-widest">Nenhuma missão hoje</p>
+          </div>
+        ) : (
+          periodosUnicos.map((periodoKey) => {
+            // Filtro robusto para evitar erros de case-sensitive
+            const tarefasDoPeriodo = tarefas.filter((t: any) => 
+              t.period?.toUpperCase() === periodoKey
+            );
+
+            if (tarefasDoPeriodo.length === 0) return null;
+
+            const info = infoPeriodo[periodoKey];
+
+            return (
+              <div key={periodoKey} className="space-y-4">
+                <div className="flex items-center gap-2 pl-2">
+                  <div className={`${info.color} p-1.5 rounded-lg border ${info.border}`}>
+                    {info.icon}
+                  </div>
+                  <h3 className="font-black text-slate-800 uppercase text-[11px] tracking-wider italic">
+                    Missões da {info.label}
+                  </h3>
+                  <div className="flex-1 h-[1px] bg-slate-100 ml-2" />
+                </div>
+
+                <div className="space-y-3">
+                  {tarefasDoPeriodo.map((tarefa: any) => {
+                    // CORREÇÃO: Busca o filho ou assume o viewingUserId caso a relação não tenha vindo completa do servidor
+                    const filhoVinculado = tarefa.assignedTo?.find((f: any) => f.id === viewingUserId);
+                    const nomeExibicao = filhoVinculado?.name || "Herói";
+                    
+                    // Se a tarefa não estiver vinculada a esse ID e o servidor não pré-filtrou, não exibe
+                    if (tarefa.assignedTo && !filhoVinculado) return null;
+
+                    const feito = tarefa.concluintesIds?.includes(viewingUserId);
+                    const diasTarefaArray = tarefa.diasSemana ? tarefa.diasSemana.split(",") : [];
+
+                    return (
+                      <motion.div 
+                        key={tarefa.id} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white p-5 rounded-[32px] shadow-sm border border-slate-50 flex items-start gap-4 relative min-h-[100px]"
+                      >
+                        <button
+                          onClick={() => toggleTarefaAction(tarefa.id, viewingUserId, dataAtual, !feito)}
+                          className={`flex-shrink-0 mt-1 transition-all ${feito ? 'text-[#1DDF6F]' : 'text-slate-100'}`}
+                        >
+                          {feito ? <CheckCircle2 size={36} fill="#1DDF6F20" /> : <Circle size={36} strokeWidth={1.5} />}
+                        </button>
+
+                        <div className="flex-1 min-w-0 pr-10">
+                          <h4 className={`font-black text-[#0F172A] text-sm uppercase tracking-tight break-words leading-relaxed ${feito ? 'line-through text-slate-300' : ''}`}>
+                            {tarefa.description}
+                          </h4>
+                          
+                          <div className="flex flex-wrap gap-1.5 mt-2 items-center">
+                            <div className="bg-blue-50 text-[#5D00FF] px-2 py-0.5 rounded-lg font-black text-[9px] uppercase flex items-center gap-1">
+                              <User size={10} /> {nomeExibicao}
+                            </div>
+                            <div className="bg-orange-50 text-orange-600 px-2 py-0.5 rounded-lg font-black text-[9px] uppercase flex items-center gap-1">
+                              <Star size={10} fill="currentColor" /> {tarefa.points} pts
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1 mt-3">
+                            {[1, 2, 3, 4, 5, 6, 0].map(diaNum => (
+                              <span 
+                                key={diaNum}
+                                className={`px-2 py-1 rounded-md font-black text-[8px] transition-colors ${
+                                  diasTarefaArray.includes(diaNum.toString())
+                                  ? 'bg-[#BC00DD] text-white' 
+                                  : 'bg-slate-50 text-slate-200'
+                                }`}
+                              >
+                                {diasMapa[diaNum]}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={() => handleDeletar(tarefa.id, tarefa.description)}
+                          className="absolute right-4 top-4 bg-red-50 p-2.5 rounded-2xl text-red-400 active:bg-red-500 active:text-white transition-all shadow-sm"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/layout.tsx">
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { Providers } from "@/components/Providers"; // Importe o provedor
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "KidsApp - Painel da Família",
+  description: "Gerencie as missões dos seus pequenos heróis!",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="pt-br">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <Providers>
+          {children}
+        </Providers>
+      </body>
+    </html>
+  );
+}
+</file>
+
+<file path="src/app/dashboard/pais/mensal/ExtratoMensalClient.tsx">
+"use client";
+
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { ArrowLeft, CheckCircle2, XCircle, Calendar, DollarSign, Save, Trophy } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { updateWeeklyAllowance } from "@/app/actions/userActions";
+
+export default function ExtratoMensalClient({ 
+  filhos, 
+  extrato, 
+  userIdAtivo, 
+  mesadaSalva, 
+  mesNome 
+}: any) {
+  const router = useRouter();
+  const [valorMesada, setValorMesada] = useState(mesadaSalva || 0);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    setValorMesada(mesadaSalva);
+  }, [mesadaSalva, userIdAtivo]);
+
+  const handleSalvarMesada = async () => {
+    try {
+      setSalvando(true);
+      await updateWeeklyAllowance(userIdAtivo, valorMesada);
+      router.refresh();
+    } catch (error) {
+      alert("Erro ao salvar o valor da mesada.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const calcularResumoSemana = (tarefasSemana: any[]) => {
+    const ganho = tarefasSemana.filter(t => t.status === 'CONCLUIDO').reduce((acc, t) => acc + t.points, 0);
+    const possivel = tarefasSemana.reduce((acc, t) => acc + t.points, 0);
+    const aproveitamento = possivel > 0 ? ganho / possivel : 0;
+    
+    // LÓGICA DE METAS FIXAS (DEGRAUS)
+    let valorParaPagar = 0;
+    let metaAtingida = "0%";
+
+    if (aproveitamento >= 0.85) {
+      valorParaPagar = valorMesada;
+      metaAtingida = "100%";
+    } else if (aproveitamento >= 0.7) {
+      valorParaPagar = valorMesada * 0.7;
+      metaAtingida = "70%";
+    } else if (aproveitamento >= 0.5) {
+      valorParaPagar = valorMesada * 0.5;
+      metaAtingida = "50%";
+    }
+
+    return { ganho, possivel, aproveitamento, valorParaPagar, metaAtingida };
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-6 pb-24 font-sans">
+      
+      {/* HEADER */}
+      <div className="max-w-3xl mx-auto flex items-center justify-between mb-8">
+        <button 
+          onClick={() => router.push('/dashboard/pais')}
+          className="p-3 bg-white rounded-2xl shadow-sm text-[#5D00FF] hover:bg-purple-50 transition-all border border-slate-100"
+        >
+          <ArrowLeft size={24} />
+        </button>
+        <h1 suppressHydrationWarning className="text-xl font-black text-slate-800 uppercase tracking-tighter italic flex items-center gap-2">
+          <Calendar className="text-[#5D00FF]" size={20} /> Extrato da Semana
+        </h1>
+        <div className="w-12" /> 
+      </div>
+
+      <div className="max-w-3xl mx-auto space-y-6">
+        
+        {/* SELETOR DE FILHOS */}
+        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+          {filhos.map((f: any) => (
+            <button
+              key={f.id}
+              onClick={() => router.push(`/dashboard/pais/mensal?userId=${f.id}`)}
+              className={`px-6 py-3 rounded-2xl font-black text-xs uppercase transition-all whitespace-nowrap border-2 ${
+                userIdAtivo === f.id ? 'bg-[#5D00FF] text-white border-[#5D00FF] shadow-lg' : 'bg-white text-slate-400 border-white'
+              }`}
+            >
+              {f.name}
+            </button>
+          ))}
+        </div>
+
+        {/* CONFIGURAÇÃO DA MESADA */}
+        <section className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center justify-between group">
+          <div className="flex items-center gap-3">
+            <div className="bg-green-100 text-green-600 p-3 rounded-2xl">
+              <DollarSign size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Mesada Semanal (100%)</p>
+              <div className="flex items-center gap-2 font-black text-2xl text-slate-800">
+                <span className="text-slate-300">R$</span>
+                <input 
+                  type="number" 
+                  value={valorMesada}
+                  onChange={(e) => setValorMesada(Number(e.target.value))}
+                  className="w-24 outline-none text-[#5D00FF] focus:bg-purple-50 rounded-lg px-1 transition-all"
+                />
+                <button 
+                  onClick={handleSalvarMesada}
+                  disabled={salvando || valorMesada === mesadaSalva}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                    valorMesada !== mesadaSalva 
+                    ? 'bg-green-500 text-white shadow-md active:scale-95' 
+                    : 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                  }`}
+                >
+                  <Save size={14} />
+                  {salvando ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* LISTAGEM POR SEMANAS */}
+        <div className="space-y-12">
+          {/* Ordenamos as chaves para garantir que a lista siga a ordem cronológica correta */}
+          {Object.keys(extrato).sort((a, b) => Number(a) - Number(b)).map((labelSemana) => {
+            const resumo = calcularResumoSemana(extrato[labelSemana]);
+            if (extrato[labelSemana].length === 0) return null;
+
+            const dataInicio = new Date(Number(labelSemana));
+            const dataFim = new Date(dataInicio.getTime() + 6 * 24 * 60 * 60 * 1000);
+            const formatarDataLocal = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+            return (
+              <section key={labelSemana} className="bg-white p-6 rounded-[40px] shadow-sm border border-slate-100 space-y-8">
+                
+                {/* CABEÇALHO SEMANA */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-50 pb-6">
+                  <div>
+                    <h3 suppressHydrationWarning className="font-black text-slate-800 uppercase tracking-tighter text-xl leading-tight">
+                      Semana {formatarDataLocal(dataInicio)} a {formatarDataLocal(dataFim)}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${resumo.valorParaPagar > 0 ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
+                        {resumo.valorParaPagar > 0 ? `🏆 Meta ${resumo.metaAtingida} Alcançada` : '🚀 Continue tentando!'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 p-4 rounded-3xl text-right min-w-[140px] shadow-xl border-b-4 border-slate-700">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Prêmio da Meta</p>
+                    <p className="text-2xl font-black text-green-400 leading-none tracking-tighter">
+                      R$ {resumo.valorParaPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* PÓDIO DE METAS - CORES VIBRANTES */}
+                <div className="grid grid-cols-3 gap-4 h-40 items-end px-4">
+                  
+                  {/* META 50% - LARANJA SOLAR */}
+                  <div className="flex flex-col items-center gap-2">
+                    <motion.p 
+                      animate={resumo.aproveitamento >= 0.5 && resumo.aproveitamento < 0.7 ? { scale: 1.1, y: -5 } : { scale: 1 }}
+                      className={`text-[11px] font-black transition-all ${resumo.aproveitamento >= 0.5 ? 'text-orange-500' : 'text-slate-300'}`}
+                    >
+                      R$ {(valorMesada * 0.5).toFixed(2)}
+                    </motion.p>
+                    <div className={`w-full rounded-t-2xl border-b-0 border-4 transition-all duration-700 ${
+                      resumo.aproveitamento >= 0.5 
+                        ? 'bg-gradient-to-t from-orange-500 to-yellow-400 border-orange-600 h-20 shadow-[0_10px_0_0_rgba(249,115,22,0.2)]' 
+                        : 'bg-slate-100 border-slate-200 h-10'
+                    }`}></div>
+                    <p className={`text-[10px] font-black uppercase ${resumo.aproveitamento >= 0.5 ? 'text-orange-600' : 'text-slate-400'}`}>50%</p>
+                  </div>
+
+                  {/* META 100% - VERDE NEON (CENTRO) */}
+                  <div className="flex flex-col items-center gap-2">
+                    <motion.p 
+                      animate={resumo.aproveitamento >= 1 ? { scale: 1.2, y: -10 } : { scale: 1 }}
+                      className={`text-[12px] font-black transition-all ${resumo.aproveitamento >= 0.85 ? 'text-green-500' : 'text-slate-300'}`}
+                    >
+                      R$ {(valorMesada).toFixed(2)}
+                    </motion.p>
+                    <div className={`w-full rounded-t-2xl border-b-0 border-4 relative transition-all duration-700 ${
+                      resumo.aproveitamento >= 0.85
+                        ? 'bg-gradient-to-t from-green-500 to-lime-400 border-green-600 h-32 shadow-[0_10px_0_0_rgba(34,197,94,0.3)]' 
+                        : 'bg-slate-100 border-slate-200 h-10'
+                    }`}>
+                        {resumo.aproveitamento >= 0.85 && (
+                          <motion.div 
+                            animate={{ y: [0, -8, 0] }}
+                            transition={{ repeat: Infinity, duration: 2 }}
+                            className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full"
+                          >
+                            <Trophy className="text-yellow-400 drop-shadow-[0_4px_0_rgba(0,0,0,0.1)]" size={36} fill="currentColor" />
+                          </motion.div>
+                        )}
+                    </div>
+                    <p className={`text-[10px] font-black uppercase ${resumo.aproveitamento >= 0.85 ? 'text-green-600' : 'text-slate-400'}`}>100%</p>
+                  </div>
+
+                  {/* META 70% - AZUL ELÉTRICO */}
+                  <div className="flex flex-col items-center gap-2">
+                    <motion.p 
+                      animate={resumo.aproveitamento >= 0.7 && resumo.aproveitamento < 1 ? { scale: 1.1, y: -5 } : { scale: 1 }}
+                      className={`text-[11px] font-black transition-all ${resumo.aproveitamento >= 0.7 ? 'text-blue-500' : 'text-slate-300'}`}
+                    >
+                      R$ {(valorMesada * 0.7).toFixed(2)}
+                    </motion.p>
+                    <div className={`w-full rounded-t-2xl border-b-0 border-4 transition-all duration-700 ${
+                      resumo.aproveitamento >= 0.7 
+                        ? 'bg-gradient-to-t from-blue-600 to-cyan-400 border-blue-700 h-24 shadow-[0_10px_0_0_rgba(37,99,235,0.2)]' 
+                        : 'bg-slate-100 border-slate-200 h-10'
+                    }`}></div>
+                    <p className={`text-[10px] font-black uppercase ${resumo.aproveitamento >= 0.7 ? 'text-blue-600' : 'text-slate-400'}`}>70%</p>
+                  </div>
+                </div>
+
+                {/* INDICADOR DE POSIÇÃO ATUAL */}
+                <div className="relative pt-6">
+                    <div className="w-full h-5 bg-slate-100 rounded-full overflow-hidden border-2 border-slate-200">
+                        <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(resumo.aproveitamento * 100, 100)}%` }}
+                            className={`h-full transition-colors ${
+                              resumo.aproveitamento >= 1 ? 'bg-green-500' : 
+                              resumo.aproveitamento >= 0.7 ? 'bg-blue-500' : 
+                              resumo.aproveitamento >= 0.5 ? 'bg-orange-500' : 'bg-slate-300'
+                            }`}
+                        />
+                    </div>
+                    <div className="flex justify-between mt-2 px-1">
+                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Progresso do Herói: {Math.round(resumo.aproveitamento * 100)}%</span>
+                         <span className="text-[10px] font-black text-blue-600 uppercase italic">
+                           {resumo.aproveitamento >= 1 ? "Incrível! Tudo Feito!" : `Faltam ${resumo.possivel - resumo.ganho} pts para a próxima meta`}
+                         </span>
+                    </div>
+                </div>
+
+                {/* LISTA DE MISSÕES - Mostra todas as tarefas da semana projetadas pelo servidor */}
+                <div className="space-y-3 pt-4 border-t border-slate-50">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Detalhamento das Missões (Semana Completa)</p>
+                  {/* Ordenamos por data para facilitar a leitura da semana */}
+                  {extrato[labelSemana].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((item: any) => {
+                    const isConcluido = item.status === 'CONCLUIDO';
+                    return (
+                      <div 
+                        key={item.id}
+                        className={`p-4 rounded-[28px] border-2 flex items-center justify-between bg-white transition-all ${
+                          isConcluido ? 'border-slate-50 shadow-sm' : 'border-dashed border-slate-100 bg-slate-50/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`p-2 rounded-2xl ${isConcluido ? 'bg-green-100 text-green-500' : 'bg-slate-100 text-slate-300'}`}>
+                            {isConcluido ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                          </div>
+                          <div>
+                            <p className={`font-black text-[13px] uppercase tracking-tight leading-tight ${isConcluido ? 'text-slate-700' : 'text-slate-400'}`}>
+                              {item.description}
+                            </p>
+                            <p suppressHydrationWarning className="text-[9px] font-black text-slate-400 uppercase mt-0.5">
+                              {new Date(item.date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`font-black text-sm ${isConcluido ? 'text-[#5D00FF]' : 'text-slate-200'}`}>
+                            {item.points} pts
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/dashboard/pais/mensal/page.tsx">
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import ExtratoMensalClient from "./ExtratoMensalClient";
+import { 
+  startOfWeek, 
+  endOfWeek, 
+  format, 
+  addDays, 
+  isBefore, 
+  isSameDay 
+} from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+export default async function PaginaMensal({
+  searchParams,
+}: {
+  searchParams: Promise<{ userId?: string }>;
+}) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session || session.user.role !== "PAI") redirect("/login");
+
+  const params = await searchParams;
+  const userId = params.userId;
+  const familyId = session.user.familyId;
+
+  // 1. Busca os heróis (filhos)
+  const filhos = await prisma.user.findMany({ 
+    where: { familyId, role: "FILHO" },
+    orderBy: { name: 'asc' }
+  });
+
+  // Garante que temos um userId selecionado
+  if (!userId && filhos.length > 0) {
+    redirect(`/dashboard/pais/mensal?userId=${filhos[0].id}`);
+  }
+
+  const filhoAtual = filhos.find(f => f.id === userId);
+
+  // 2. Definir EXATAMENTE a semana vigente (Segunda a Domingo)
+  const hoje = new Date();
+  const dataBuscaInicio = startOfWeek(hoje, { weekStartsOn: 1 }); // Segunda
+  const dataBuscaFim = endOfWeek(hoje, { weekStartsOn: 1 });    // Domingo
+
+  // 3. Busca as tarefas e as execuções apenas desta semana
+  const [todasTarefas, execucoes] = await Promise.all([
+    prisma.task.findMany({ 
+      where: { familyId, assignedTo: { some: { id: userId } } } 
+    }),
+    prisma.taskExecution.findMany({
+      where: {
+        userId: userId,
+        date: { gte: dataBuscaInicio, lte: dataBuscaFim },
+      }
+    })
+  ]);
+
+  const extratoFinal: Record<string, any[]> = {};
+  const labelSemana = dataBuscaInicio.getTime().toString();
+  extratoFinal[labelSemana] = [];
+
+  // 4. Montar os 7 dias da semana (Projeção Completa)
+  let d = new Date(dataBuscaInicio);
+
+  for (let i = 0; i < 7; i++) {
+    const dataAtualLoop = new Date(d);
+    const diaSemanaInt = dataAtualLoop.getDay(); // 0 (Dom) a 6 (Sab)
+
+    // Filtra tarefas que devem acontecer neste dia da semana
+    const tarefasDoDia = todasTarefas.filter(t => 
+      t.diasSemana.split(',').includes(diaSemanaInt.toString())
+    );
+
+    tarefasDoDia.forEach(tarefa => {
+      const foiFeita = execucoes.find(e => 
+        e.taskId === tarefa.id && isSameDay(new Date(e.date), dataAtualLoop)
+      );
+
+      extratoFinal[labelSemana].push({
+        id: `${tarefa.id}-${format(dataAtualLoop, "yyyy-MM-dd")}`,
+        description: tarefa.description,
+        points: tarefa.points,
+        date: dataAtualLoop.toISOString(),
+        status: foiFeita ? 'CONCLUIDO' : 'NAO_FEITO'
+      });
+    });
+    
+    d = addDays(d, 1);
+  }
+
+  // 5. Ordenar tarefas do dia (da mais antiga para a mais nova na semana)
+  extratoFinal[labelSemana].sort((a, b) => 
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  return (
+    <ExtratoMensalClient 
+      filhos={filhos.map(f => ({ id: f.id, name: f.name }))} 
+      extrato={extratoFinal} 
+      userIdAtivo={userId}
+      mesadaSalva={filhoAtual?.weeklyAllowance || 0}
+      mesNome={format(hoje, "MMMM", { locale: ptBR })}
+    />
+  );
+}
+</file>
+
+<file path="src/app/dashboard/pais/DashboardClient.tsx">
+"use client";
+
+import { useState } from "react";
+import { useSession, signOut } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trophy, PlusCircle, Calendar, LogOut } from "lucide-react";
+import ModalNovaTarefa from "@/components/ModalNovaTarefa";
+import TabelaMissoes from "./TabelaMissoes";
+
+export default function DashboardClient({ 
+  herois, 
+  tarefas, 
+  dataContexto, 
+  filhosBase, 
+  familyId, 
+  progressoDia 
+}: any) {
+  const { data: session, status } = useSession();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const router = useRouter();
+  
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "placar";
+  const viewingUserId = searchParams.get("userId");
+
+  if (status === "loading") return <div className="min-h-screen flex items-center justify-center font-black text-blue-500 animate-pulse">CARREGANDO... 🚀</div>;
+
+  return (
+    <div className="min-h-screen bg-blue-50 font-sans pb-24">
+      {/* Navbar */}
+      <nav className="bg-white p-4 shadow-md border-b-4 border-yellow-400 flex justify-between items-center px-8 sticky top-0 z-40">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/dashboard/pais')}>
+          <div className="bg-blue-600 p-2 rounded-lg text-white"><Trophy size={20} /></div>
+          <span className="font-black text-blue-900 text-xl tracking-tighter uppercase">Up Kids</span>
+        </div>
+        <button onClick={() => signOut()} className="text-red-500 font-bold flex items-center gap-2 bg-red-50 px-4 py-2 rounded-xl hover:bg-red-500 hover:text-white transition-all">
+          <LogOut size={18} /> <span className="hidden md:inline">Sair</span>
+        </button>
+      </nav>
+
+      <main className="max-w-5xl mx-auto p-6">
+        
+        {/* BOTÕES DE AÇÃO */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsModalOpen(true)}
+            className="bg-green-500 p-6 rounded-[32px] text-white shadow-lg flex flex-col items-center gap-2 border-b-4 border-green-700 active:translate-y-1 transition-all"
+          >
+            <PlusCircle size={28} />
+            <span className="font-black text-xs uppercase tracking-widest">Nova Missão</span>
+          </motion.button>
+          
+          {/* BOTÃO MENSAL AJUSTADO: Removida opacidade e adicionado clique */}
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push('/dashboard/pais/mensal')}
+            className="bg-purple-500 p-6 rounded-[32px] text-white shadow-lg flex flex-col items-center gap-2 border-b-4 border-purple-700 active:translate-y-1 transition-all"
+          >
+            <Calendar size={28} />
+            <span className="font-black text-xs uppercase tracking-widest">Extrato</span>
+          </motion.button>
+        </section>
+
+        {activeTab === "placar" ? (
+          <>
+            <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 tracking-tighter uppercase">
+              <Trophy className="text-yellow-500" /> Placar da Semana
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {herois.map((heroi: any) => (
+                <FilhoCard 
+                  key={heroi.id}
+                  nome={heroi.nome} 
+                  cor={heroi.nome === "Gabriel" ? "bg-orange-100" : "bg-blue-100"} 
+                  borderColor={heroi.nome === "Gabriel" ? "border-orange-400" : "border-blue-400"} 
+                  btnColor={heroi.nome === "Gabriel" ? "bg-orange-600" : "bg-blue-600"}
+                  pontos={heroi.pontos}
+                  meta={heroi.totalSemana} 
+                  onVerTarefas={() => router.push(`/dashboard/pais?date=${dataContexto}&tab=missoes&userId=${heroi.id}`)}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <TabelaMissoes 
+              tarefas={tarefas} 
+              dataAtual={dataContexto} 
+              viewingUserId={viewingUserId} 
+              progressoDia={progressoDia}
+            />
+          </div>
+        )}
+      </main>
+
+      {/* Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <ModalNovaTarefa 
+            filhos={filhosBase} 
+            familyId={familyId} 
+            onClose={() => setIsModalOpen(false)} 
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function FilhoCard({ nome, cor, borderColor, btnColor, pontos, meta, onVerTarefas }: any) {
+  const metaSegura = meta > 0 ? meta : 1;
+  const progresso = Math.min((pontos / metaSegura) * 100, 100);
+
+  return (
+    <motion.div 
+      whileHover={{ y: -5 }}
+      className={`${cor} rounded-[40px] p-8 border-b-8 ${borderColor} shadow-xl relative overflow-hidden`}
+    >
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{nome}</h3>
+          <span className="bg-white/60 px-3 py-1 rounded-full text-[10px] font-black uppercase text-slate-600">Super Herói</span>
+        </div>
+        <div className="text-right">
+          <p className="text-4xl font-black text-slate-800 tracking-tighter">
+            {pontos}
+            <span className="text-slate-400 text-2xl font-bold">/{meta}</span>
+          </p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pontos na Semana</p>
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <div className="w-full h-8 bg-white/40 rounded-full overflow-hidden p-1.5 border-2 border-white shadow-inner">
+          <motion.div 
+            initial={{ width: 0 }} 
+            animate={{ width: `${progresso}%` }} 
+            className={`h-full ${btnColor} rounded-full shadow-lg transition-all duration-1000`} 
+          />
+        </div>
+      </div>
+
+      <button onClick={onVerTarefas} className={`w-full py-4 rounded-2xl text-white font-black uppercase tracking-widest shadow-md ${btnColor} hover:brightness-110 active:scale-95 transition-all`}>
+        Ver Missões de Hoje
+      </button>
+    </motion.div>
+  );
+}
+</file>
+
+<file path="src/app/dashboard/pais/page.tsx">
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import DashboardClient from "./DashboardClient";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek } from "date-fns";
+
+export default async function DashboardPais({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string; tab?: string; userId?: string }>;
+}) {
+  const session = await getServerSession(authOptions);
+
+  if (!session) redirect("/login");
+  if (session.user.role === "FILHO") redirect("/dashboard/filho");
+  if (!session.user.familyId) redirect("/login");
+
+  const { date, userId } = await searchParams;
+  const familyId = session.user.familyId;
+
+  // 1. Tratamento da Data e Intervalos
+  const dataString = date || new Date().toISOString().split('T')[0];
+  const dataFoco = new Date(`${dataString}T12:00:00`);
+  const diaDaSemana = dataFoco.getDay();
+
+  // Para a lista diária
+  const inicioDia = startOfDay(dataFoco);
+  const fimDia = endOfDay(dataFoco);
+
+  // Para o placar semanal (Segunda a Domingo)
+  const inicioSemana = startOfWeek(dataFoco, { weekStartsOn: 1 });
+  const fimSemana = endOfWeek(dataFoco, { weekStartsOn: 1 });
+
+  // 2. Busca de Dados no Prisma
+  const [filhosNoBanco, tarefasNoBanco] = await Promise.all([
+    prisma.user.findMany({
+      where: { familyId, role: "FILHO" },
+      include: { 
+        tasksAssigned: true, 
+        executions: {
+          where: { date: { gte: inicioSemana, lte: fimSemana } },
+          include: { task: true }
+        } 
+      },
+    }),
+    prisma.task.findMany({
+      where: { 
+        familyId,
+        diasSemana: { contains: diaDaSemana.toString() },
+        ...(userId ? { assignedTo: { some: { id: userId } } } : {})
+      },
+      include: { 
+        assignedTo: true, 
+        executions: {
+          where: { date: { gte: inicioDia, lte: fimDia } }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+  ]);
+
+  // 3. Formatação do Placar Dinâmico (Heróis)
+  const herois = filhosNoBanco.map((f) => {
+    // Pontos ganhos na semana atual
+    const pontosGanhos = f.executions.reduce((acc, exec) => acc + (exec.task?.points || 0), 0);
+
+    // TOTAL POSSÍVEL: Soma (pontos da tarefa * dias que ela aparece na semana)
+    const totalPossivelSemana = f.tasksAssigned.reduce((acc, tarefa) => {
+      const diasArray = tarefa.diasSemana ? tarefa.diasSemana.split(",") : [];
+      return acc + (tarefa.points * diasArray.length);
+    }, 0);
+
+    return {
+      id: f.id,
+      nome: f.name,
+      pontos: pontosGanhos,
+      // Se não houver tarefas, usamos 1 como fallback para não quebrar a barra de progresso (divisão por zero)
+      totalSemana: totalPossivelSemana || 10, 
+    };
+  });
+
+  // 4. Formatação das Tarefas para o Cliente
+  const tarefasTratadas = tarefasNoBanco.map((t) => ({
+    id: t.id,
+    description: t.description,
+    points: t.points,
+    period: t.period, 
+    diasSemana: t.diasSemana,
+    assignedTo: t.assignedTo || [], 
+    concluintesIds: t.executions.map(e => e.userId),
+  }));
+
+  // 5. Progresso do Dia (apenas o herói selecionado ou geral)
+  const totalPossivelHoje = tarefasNoBanco.length;
+  const realizadoHoje = tarefasNoBanco.filter(t => 
+    userId ? t.executions.some(e => e.userId === userId) : t.executions.length > 0
+  ).length;
+
+  return (
+    <DashboardClient 
+      herois={herois} 
+      tarefas={tarefasTratadas} 
+      dataContexto={dataString}
+      familyId={familyId}
+      filhosBase={filhosNoBanco.map(f => ({ id: f.id, nome: f.name }))}
+      userName={session.user.name}
+      viewingUserId={userId}
+      progressoDia={{
+        realizado: realizadoHoje,
+        total: totalPossivelHoje
+      }}
+    />
+  );
+}
+</file>
+
+<file path="src/app/login/page.tsx">
+"use client";
+
+import { signIn } from "next-auth/react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion"; // Para animações
+import { Rocket, Lock, Mail, Star, Sun } from "lucide-react"; // Ícones divertidos
+
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(""); // Limpa erro anterior
+
+    // 1. Tenta fazer o login sem redirecionar automaticamente
+    const result = await signIn("credentials", { 
+      email, 
+      password, 
+      redirect: false 
+    });
+
+    if (result?.error) {
+      setError("Ops! Email ou senha errados. Tente de novo! ✌️");
+    } else {
+      // 2. Se o login deu certo, buscamos os dados da sessão 
+      // para saber se é PAI ou FILHO
+      const res = await fetch("/api/auth/session");
+      const session = await res.json();
+
+      // 3. Redirecionamento baseado na ROLE definida no NextAuth
+      if (session?.user?.role === "PAI") {
+        router.push("/dashboard/pais");
+      } else if (session?.user?.role === "FILHO") {
+        router.push("/dashboard/filho");
+      } else {
+        // Fallback caso algo dê errado
+        router.push("/");
+      }
+      
+      router.refresh();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-blue-400 to-purple-500 flex items-center justify-center p-4 overflow-hidden relative">
+      
+      {/* Elementos flutuantes de fundo */}
+      <motion.div animate={{ y: [0, -20, 0] }} transition={{ duration: 4, repeat: Infinity }} className="absolute top-10 left-10 text-yellow-300 opacity-50"><Sun size={80} /></motion.div>
+      <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 3, repeat: Infinity }} className="absolute bottom-20 right-10 text-white opacity-30"><Star size={60} /></motion.div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, type: "spring" }}
+        className="bg-white p-8 rounded-[40px] shadow-[0_20px_0_0_rgba(0,0,0,0.1)] w-full max-w-md border-8 border-yellow-300 relative"
+      >
+        {/* Ícone de foguete no topo */}
+        <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-yellow-400 p-4 rounded-full border-8 border-white shadow-lg">
+          <Rocket className="text-blue-600" size={40} />
+        </div>
+
+        <h1 className="text-4xl font-black text-center text-blue-600 mb-2 mt-4 tracking-tighter">
+          APP KIDS
+        </h1>
+        <p className="text-center text-purple-400 font-bold mb-8 italic">🚀 Área Secreta da Família</p>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="relative">
+            <label className="block text-sm font-black text-blue-900 mb-2 ml-1 uppercase">Email do Papai ou Mamãe</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-300" size={20} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 rounded-2xl border-4 border-blue-50 bg-blue-50 text-blue-900 font-bold placeholder:text-blue-300 focus:border-yellow-400 focus:bg-white outline-none transition-all text-lg"
+                placeholder="exemplo@email.com"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="relative">
+            <label className="block text-sm font-black text-blue-900 mb-2 ml-1 uppercase">Senha Secreta</label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-300" size={20} />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 rounded-2xl border-4 border-blue-50 bg-blue-50 text-blue-900 font-bold placeholder:text-blue-300 focus:border-yellow-400 focus:bg-white outline-none transition-all text-lg"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+          </div>
+
+          {error && (
+  <motion.p 
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ 
+      opacity: 1, 
+      scale: 1,
+      x: [-4, 4, -4, 4, 0] // Efeito de tremer no eixo X
+    }}
+    transition={{ duration: 0.4 }}
+    className="text-red-500 text-sm font-black text-center bg-red-50 p-2 rounded-lg"
+  >
+    {error}
+  </motion.p>
+)}
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            type="submit"
+            className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-black py-5 rounded-[25px] shadow-[0_8px_0_0_#ca8a04] active:shadow-none active:translate-y-2 transition-all text-xl uppercase tracking-wider"
+          >
+            VAMOS ENTRAR! 🎈
+          </motion.button>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/ModalNovaTarefa.tsx">
+"use client";
+
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { X } from "lucide-react";
+import { criarTarefaAction } from "@/app/dashboard/pais/actions";
+
+export default function ModalNovaTarefa({ filhos, familyId, onClose }: any) {
+  const [descricao, setDescricao] = useState("");
+  const [pontos, setPontos] = useState(""); // Começa vazio para mostrar o placeholder
+  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [dias, setDias] = useState<number[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  const [period, setPeriod] = useState("MANHA");
+
+  const diasMapa = [
+    { id: 1, label: "SEG" }, { id: 2, label: "TER" }, { id: 3, label: "QUA" },
+    { id: 4, label: "QUI" }, { id: 5, label: "SEX" }, { id: 6, label: "SAB" }, { id: 0, label: "DOM" }
+  ];
+
+  const handleSalvar = async () => {
+    if (!descricao || selecionados.length === 0 || dias.length === 0 || !pontos) {
+        alert("Ops! Preencha a descrição, pontos, escolha pelo menos um herói e um dia!");
+        return;
+    }
+    setLoading(true);
+    await criarTarefaAction({
+      descricao,
+      pontos: Number(pontos),
+      filhosIds: selecionados,
+      diasSemana: dias.join(","),
+      periodo: period,
+      familyId
+    });
+    setLoading(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }} 
+        animate={{ scale: 1, opacity: 1 }} 
+        className="bg-white rounded-[40px] p-8 w-full max-w-md shadow-2xl relative"
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-black text-blue-900 uppercase tracking-tighter flex items-center gap-2">
+            Nova Missão 🚀
+          </h2>
+          <button onClick={onClose} className="bg-slate-100 p-2 rounded-full hover:bg-slate-200 transition-colors">
+            <X size={20} className="text-slate-500" />
+          </button>
+        </div>
+
+        <div className="space-y-5">
+          {/* Campo Descrição */}
+          <div>
+            <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest ml-2 mb-1 block">O que precisa ser feito?</label>
+            <input 
+              type="text"
+              value={descricao}
+              placeholder="Ex: Arrumar o quarto"
+              className="w-full p-4 rounded-2xl bg-slate-50 font-bold text-slate-700 border-2 border-transparent focus:border-blue-400 outline-none transition-all"
+              onChange={(e) => setDescricao(e.target.value)}
+            />
+          </div>
+
+          {/* Campo Pontos */}
+          <div>
+            <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest ml-2 mb-1 block">Quantos pontos vale?</label>
+            <input 
+              type="number" 
+              value={pontos}
+              placeholder="Ex: 50"
+              className="w-full p-4 rounded-2xl bg-slate-50 font-bold text-slate-700 border-2 border-transparent focus:border-blue-400 outline-none transition-all"
+              onChange={(e) => setPontos(e.target.value)}
+            />
+          </div>
+
+          {/* Seleção de Filhos */}
+          <div>
+            <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest ml-2 mb-2 block">Para quais heróis?</label>
+            <div className="flex gap-2">
+              {filhos.map((f: any) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setSelecionados(prev => prev.includes(f.id) ? prev.filter(id => id !== f.id) : [...prev, f.id])}
+                  className={`flex-1 py-3 rounded-xl font-black text-xs transition-all border-2 ${selecionados.includes(f.id) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'}`}
+                >
+                  {f.nome.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Seleção de Dias */}
+          <div>
+            <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest ml-2 mb-2 block">Em quais dias?</label>
+            <div className="flex justify-between">
+              {diasMapa.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setDias(prev => prev.includes(d.id) ? prev.filter(id => id !== d.id) : [...prev, d.id])}
+                  className={`w-10 h-10 rounded-full font-black text-[10px] transition-all flex items-center justify-center border-2 ${dias.includes(d.id) ? 'bg-yellow-400 border-yellow-500 text-yellow-900' : 'bg-white border-slate-100 text-slate-700'}`}
+                >
+                  {d.label[0]}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2 mt-2">
+              <label className="font-black text-slate-700 uppercase text-xs">Período da Missão</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['MANHA', 'TARDE', 'NOITE'].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPeriod(p)}
+                    className={`py-2 rounded-xl font-black text-[10px] border-2 transition-all ${
+                      period === p ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          <button 
+            disabled={loading}
+            onClick={handleSalvar}
+            className="w-full bg-[#5D00FF] text-white py-5 rounded-3xl font-black uppercase tracking-widest shadow-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 mt-4"
+          >
+            {loading ? "SALVANDO..." : "CRIAR MISSÃO!"}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+</file>
+
+<file path="docker-compose.yml">
+services:
+  # --- APLICAÇÃO NEXT.JS ---
+  app-upkids-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ${PROJECT_NAME}-nextjs
+    restart: always
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - NODE_ENV=${NODE_ENV}
+    depends_on:
+      - app-upkids-db-prod
+    env_file:
+      - .env
+
+  # --- POSTGRESQL DE PRODUÇÃO ---
+  app-upkids-db-prod:
+    image: postgres:15-alpine
+    container_name: ${PROJECT_NAME}-postgres-prod
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_PROD_USER}
+      - POSTGRES_PASSWORD=${DB_PROD_PASSWORD}
+      - POSTGRES_DB=${DB_PROD_NAME}
+    volumes:
+      - pg_prod_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PROD_PORT}:5432"
+
+  # --- POSTGRESQL DE DESENVOLVIMENTO ---
+  app-upkids-db-dev:
+    image: postgres:15-alpine
+    container_name: ${PROJECT_NAME}-postgres-dev
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_DEV_USER}
+      - POSTGRES_PASSWORD=${DB_DEV_PASSWORD}
+      - POSTGRES_DB=${DB_DEV_NAME}
+    volumes:
+      - pg_dev_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_DEV_PORT_EXTERNAL}:5432"
+
+volumes:
+  pg_prod_data:
+    name: ${PROJECT_NAME}-prod-vol
+  pg_dev_data:
+    name: ${PROJECT_NAME}-dev-vol
+</file>
+
+<file path="package.json">
+{
+  "name": "app-upkids",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "date-fns": "^4.1.0",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.8.0",
+    "next": "16.1.6",
+    "next-auth": "^4.24.14",
+    "prisma": "^6.19.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
+  }
+}
+</file>
+
+<file path="prisma/schema.prisma">
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Family {
+  id    String @id @default(cuid())
+  name  String
+  users User[]
+  tasks Task[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String
+  role          String   @default("FILHO") // PAI ou FILHO
+  weeklyAllowance Float    @default(0) // Adicione este campo
+  familyId      String
+  family        Family   @relation(fields: [familyId], references: [id])
+  
+  // Alterado para permitir que um usuário tenha muitas tarefas
+  tasksAssigned Task[]   @relation("TaskToUser")
+  
+  // Execuções específicas deste usuário (Importante para o Placar)
+  executions    TaskExecution[]
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  description String
+  points      Int
+  diasSemana  String?  // Ex: "1,2,3" (Seg, Ter, Qua)
+  familyId    String
+  family      Family   @relation(fields: [familyId], references: [id])
+  period      String   @default("MANHA") // "MANHA", "TARDE" ou "NOITE"
+  
+  // Alterado para permitir múltiplos heróis na mesma tarefa
+  assignedTo  User[]   @relation("TaskToUser")
+  
+  executions  TaskExecution[]
+  createdAt   DateTime @default(now())
+}
+
+model TaskExecution {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String   // Adicionado: Quem completou a tarefa
+  date      DateTime // Data da conclusão (meio-dia T12:00:00Z)
+  
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // O check é único por tarefa, usuário e dia
+  @@unique([taskId, userId, date])
+}
+</file>
+
+<file path="src/app/api/auth/[...nextauth]/route.ts">
+import NextAuth, { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+
+export const dynamic = "force-dynamic";
+
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Senha", type: "password" }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email }
+        });
+
+        if (!user) return null;
+
+        const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+
+        if (!isPasswordValid) return null;
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          familyId: user.familyId,
+        };
+      }
+    })
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = (user as any).role;
+        token.familyId = (user as any).familyId;
+        token.id = user.id;
+      }
+      return token;
+    },
+    async session({ session, token }: any) {
+      if (session.user) {
+        session.user.role = token.role;
+        session.user.familyId = token.familyId;
+        session.user.id = token.id;
+      }
+      return session;
+    },
+    // ADICIONADO: Força o redirecionamento para o login em logouts
+    async redirect({ url, baseUrl }) {
+      // Se a URL contém o comando de signout, manda para /login
+      if (url.includes("signout")) return `${baseUrl}/login`;
+      
+      // Permite redirecionamentos relativos (dentro do seu site)
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      
+      // Permite redirecionamentos para a mesma origem (IP ou domínio)
+      else if (new URL(url).origin === baseUrl) return url;
+      
+      return baseUrl;
+    }
+  },
+  pages: {
+    signIn: "/login",
+    signOut: "/login", // ADICIONADO: Define a página de logout
+    error: "/login",
+  },
+  session: {
+    strategy: "jwt"
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+};
+
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  output: 'standalone', 
+  typescript: {
+    ignoreBuildErrors: true, 
+  },
+  // Adicionando o redirecionamento da raiz (/) para o (/login)
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/login',
+        permanent: true,
+      },
+    ];
+  },
+};
+
+export default nextConfig;
+</file>
+
+</files>

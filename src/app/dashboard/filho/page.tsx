@@ -18,8 +18,8 @@ export default async function DashboardFilho() {
   const dataString = hoje.toISOString().split('T')[0];
 
   // Datas para o placar da semana (Segunda a Domingo)
-  const inicioSemana = startOfWeek(hoje, { weekStartsOn: 1 });
-  const fimSemana = endOfWeek(hoje, { weekStartsOn: 1 });
+  const inicioSemana = startOfWeek(hoje, { weekStartsOn: 0 });
+  const fimSemana = endOfWeek(hoje, { weekStartsOn: 0 });
 
   // 1. Busca de Dados: Tarefas do dia + Placar da Família
   const [tarefasNoBanco, filhosNoBanco] = await Promise.all([

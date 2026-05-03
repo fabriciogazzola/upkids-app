@@ -8,10 +8,14 @@ import {
   endOfWeek, 
   format, 
   addDays, 
-  isBefore, 
-  isSameDay 
+  isSameDay,
+  startOfDay 
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// Força o reprocessamento para evitar cache de datas antigas
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function PaginaMensal({
   searchParams,
@@ -26,25 +30,27 @@ export default async function PaginaMensal({
   const userId = params.userId;
   const familyId = session.user.familyId;
 
-  // 1. Busca os heróis (filhos)
   const filhos = await prisma.user.findMany({ 
     where: { familyId, role: "FILHO" },
     orderBy: { name: 'asc' }
   });
 
-  // Garante que temos um userId selecionado
   if (!userId && filhos.length > 0) {
     redirect(`/dashboard/pais/mensal?userId=${filhos[0].id}`);
   }
 
   const filhoAtual = filhos.find(f => f.id === userId);
 
-  // 2. Definir EXATAMENTE a semana vigente (Segunda a Domingo)
-  const hoje = new Date();
-  const dataBuscaInicio = startOfWeek(hoje, { weekStartsOn: 1 }); // Segunda
-  const dataBuscaFim = endOfWeek(hoje, { weekStartsOn: 1 });    // Domingo
+  // --- CORREÇÃO DE FUSO HORÁRIO ---
+  // Obtemos a data atual e forçamos o fuso de Brasília (America/Sao_Paulo)
+  // Isso resolve o problema de mostrar dia 02 quando já é dia 03 no Brasil.
+  const dataHojeBR = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const hoje = startOfDay(dataHojeBR); 
+  
+  // Define a semana começando no DOMINGO (weekStartsOn: 0)
+  const dataBuscaInicio = startOfWeek(hoje, { weekStartsOn: 0 }); 
+  const dataBuscaFim = endOfWeek(hoje, { weekStartsOn: 0 });
 
-  // 3. Busca as tarefas e as execuções apenas desta semana
   const [todasTarefas, execucoes] = await Promise.all([
     prisma.task.findMany({ 
       where: { familyId, assignedTo: { some: { id: userId } } } 
@@ -52,7 +58,10 @@ export default async function PaginaMensal({
     prisma.taskExecution.findMany({
       where: {
         userId: userId,
-        date: { gte: dataBuscaInicio, lte: dataBuscaFim },
+        date: { 
+          gte: dataBuscaInicio, 
+          lte: dataBuscaFim 
+        },
       }
     })
   ]);
@@ -61,16 +70,15 @@ export default async function PaginaMensal({
   const labelSemana = dataBuscaInicio.getTime().toString();
   extratoFinal[labelSemana] = [];
 
-  // 4. Montar os 7 dias da semana (Projeção Completa)
+  // Montar os 7 dias da semana (Domingo a Sábado)
   let d = new Date(dataBuscaInicio);
 
   for (let i = 0; i < 7; i++) {
-    const dataAtualLoop = new Date(d);
-    const diaSemanaInt = dataAtualLoop.getDay(); // 0 (Dom) a 6 (Sab)
+    const dataAtualLoop = startOfDay(new Date(d));
+    const diaSemanaInt = dataAtualLoop.getDay(); 
 
-    // Filtra tarefas que devem acontecer neste dia da semana
     const tarefasDoDia = todasTarefas.filter(t => 
-      t.diasSemana.split(',').includes(diaSemanaInt.toString())
+      t.diasSemana?.split(',').includes(diaSemanaInt.toString())
     );
 
     tarefasDoDia.forEach(tarefa => {
@@ -90,7 +98,6 @@ export default async function PaginaMensal({
     d = addDays(d, 1);
   }
 
-  // 5. Ordenar tarefas do dia (da mais antiga para a mais nova na semana)
   extratoFinal[labelSemana].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );

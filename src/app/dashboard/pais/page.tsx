@@ -29,8 +29,8 @@ export default async function DashboardPais({
   const fimDia = endOfDay(dataFoco);
 
   // Para o placar semanal (Segunda a Domingo)
-  const inicioSemana = startOfWeek(dataFoco, { weekStartsOn: 1 });
-  const fimSemana = endOfWeek(dataFoco, { weekStartsOn: 1 });
+  const inicioSemana = startOfWeek(dataFoco, { weekStartsOn: 0 });
+  const fimSemana = endOfWeek(dataFoco, { weekStartsOn: 0 });
 
   // 2. Busca de Dados no Prisma
   const [filhosNoBanco, tarefasNoBanco] = await Promise.all([
