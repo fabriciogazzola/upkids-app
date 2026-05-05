@@ -5,6 +5,10 @@ import { prisma } from "@/lib/prisma";
 import DashboardClient from "./DashboardClient";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek } from "date-fns";
 
+// Força o reprocessamento para evitar que datas antigas fiquem em cache
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function DashboardPais({
   searchParams,
 }: {
@@ -19,20 +23,21 @@ export default async function DashboardPais({
   const { date, userId } = await searchParams;
   const familyId = session.user.familyId;
 
-  // 1. Tratamento da Data e Intervalos
-  const dataString = date || new Date().toISOString().split('T')[0];
+  // 1. Tratamento de Data com Fuso Horário Brasil
+  const hojeBR = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const dataString = date || hojeBR.toISOString().split('T')[0];
+  
+  // Criamos a data de foco garantindo o meio-dia para evitar saltos de fuso
   const dataFoco = new Date(`${dataString}T12:00:00`);
   const diaDaSemana = dataFoco.getDay();
 
-  // Para a lista diária
+  // 2. A ÂNCORA: Trava o Placar Semanal entre Domingo e Sábado da data selecionada
+  const inicioSemana = startOfWeek(dataFoco, { weekStartsOn: 0 }); // Sempre Domingo
+  const fimSemana = endOfWeek(dataFoco, { weekStartsOn: 0 });    // Sempre Sábado
+
   const inicioDia = startOfDay(dataFoco);
   const fimDia = endOfDay(dataFoco);
 
-  // Para o placar semanal (Segunda a Domingo)
-  const inicioSemana = startOfWeek(dataFoco, { weekStartsOn: 0 });
-  const fimSemana = endOfWeek(dataFoco, { weekStartsOn: 0 });
-
-  // 2. Busca de Dados no Prisma
   const [filhosNoBanco, tarefasNoBanco] = await Promise.all([
     prisma.user.findMany({
       where: { familyId, role: "FILHO" },
@@ -60,12 +65,8 @@ export default async function DashboardPais({
     })
   ]);
 
-  // 3. Formatação do Placar Dinâmico (Heróis)
   const herois = filhosNoBanco.map((f) => {
-    // Pontos ganhos na semana atual
     const pontosGanhos = f.executions.reduce((acc, exec) => acc + (exec.task?.points || 0), 0);
-
-    // TOTAL POSSÍVEL: Soma (pontos da tarefa * dias que ela aparece na semana)
     const totalPossivelSemana = f.tasksAssigned.reduce((acc, tarefa) => {
       const diasArray = tarefa.diasSemana ? tarefa.diasSemana.split(",") : [];
       return acc + (tarefa.points * diasArray.length);
@@ -75,12 +76,10 @@ export default async function DashboardPais({
       id: f.id,
       nome: f.name,
       pontos: pontosGanhos,
-      // Se não houver tarefas, usamos 1 como fallback para não quebrar a barra de progresso (divisão por zero)
       totalSemana: totalPossivelSemana || 10, 
     };
   });
 
-  // 4. Formatação das Tarefas para o Cliente
   const tarefasTratadas = tarefasNoBanco.map((t) => ({
     id: t.id,
     description: t.description,
@@ -91,8 +90,6 @@ export default async function DashboardPais({
     concluintesIds: t.executions.map(e => e.userId),
   }));
 
-  // 5. Progresso do Dia (apenas o herói selecionado ou geral)
-  const totalPossivelHoje = tarefasNoBanco.length;
   const realizadoHoje = tarefasNoBanco.filter(t => 
     userId ? t.executions.some(e => e.userId === userId) : t.executions.length > 0
   ).length;
@@ -108,7 +105,7 @@ export default async function DashboardPais({
       viewingUserId={userId}
       progressoDia={{
         realizado: realizadoHoje,
-        total: totalPossivelHoje
+        total: tarefasNoBanco.length
       }}
     />
   );

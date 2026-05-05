@@ -5,6 +5,9 @@ import { motion } from "framer-motion";
 import { ArrowLeft, CheckCircle2, XCircle, Calendar, DollarSign, Save, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { updateWeeklyAllowance } from "@/app/actions/userActions";
+// Adicione o import do format do date-fns se ainda não tiver no arquivo ou use o nativo
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function ExtratoMensalClient({ 
   filhos, 
@@ -38,10 +41,10 @@ export default function ExtratoMensalClient({
     const possivel = tarefasSemana.reduce((acc, t) => acc + t.points, 0);
     const aproveitamento = possivel > 0 ? ganho / possivel : 0;
     
-    // LÓGICA DE METAS FIXAS (DEGRAUS)
     let valorParaPagar = 0;
     let metaAtingida = "0%";
 
+    // Regra dos 85% que você definiu como topo visual
     if (aproveitamento >= 0.85) {
       valorParaPagar = valorMesada;
       metaAtingida = "100%";
@@ -62,7 +65,7 @@ export default function ExtratoMensalClient({
       {/* HEADER */}
       <div className="max-w-3xl mx-auto flex items-center justify-between mb-8">
         <button 
-          onClick={() => router.push('/dashboard/pais')}
+          onClick={() => window.location.href = '/dashboard/pais'} // Força o recarregamento ao voltar
           className="p-3 bg-white rounded-2xl shadow-sm text-[#5D00FF] hover:bg-purple-50 transition-all border border-slate-100"
         >
           <ArrowLeft size={24} />
@@ -80,7 +83,7 @@ export default function ExtratoMensalClient({
           {filhos.map((f: any) => (
             <button
               key={f.id}
-              onClick={() => router.push(`/dashboard/pais/mensal?userId=${f.id}`)}
+              onClick={() => window.location.href = `/dashboard/pais/mensal?userId=${f.id}`} // Hard reload para garantir fuso
               className={`px-6 py-3 rounded-2xl font-black text-xs uppercase transition-all whitespace-nowrap border-2 ${
                 userIdAtivo === f.id ? 'bg-[#5D00FF] text-white border-[#5D00FF] shadow-lg' : 'bg-white text-slate-400 border-white'
               }`}
@@ -125,13 +128,14 @@ export default function ExtratoMensalClient({
 
         {/* LISTAGEM POR SEMANAS */}
         <div className="space-y-12">
-          {/* Ordenamos as chaves para garantir que a lista siga a ordem cronológica correta */}
-          {Object.keys(extrato).sort((a, b) => Number(a) - Number(b)).map((labelSemana) => {
+          {/* Pegamos apenas a chave mais recente para evitar o bug de pular semanas no histórico */}
+          {Object.keys(extrato).sort((a, b) => Number(b) - Number(a)).slice(0, 1).map((labelSemana) => {
             const resumo = calcularResumoSemana(extrato[labelSemana]);
-            if (extrato[labelSemana].length === 0) return null;
-
+            
             const dataInicio = new Date(Number(labelSemana));
+            // Ajuste para garantir que o fim da semana seja Sábado (6 dias após o Domingo)
             const dataFim = new Date(dataInicio.getTime() + 6 * 24 * 60 * 60 * 1000);
+            
             const formatarDataLocal = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
             return (
@@ -157,95 +161,58 @@ export default function ExtratoMensalClient({
                   </div>
                 </div>
 
-                {/* PÓDIO DE METAS - CORES VIBRANTES */}
+                {/* PÓDIO DE METAS */}
                 <div className="grid grid-cols-3 gap-4 h-40 items-end px-4">
-                  
-                  {/* META 50% - LARANJA SOLAR */}
                   <div className="flex flex-col items-center gap-2">
-                    <motion.p 
-                      animate={resumo.aproveitamento >= 0.5 && resumo.aproveitamento < 0.7 ? { scale: 1.1, y: -5 } : { scale: 1 }}
-                      className={`text-[11px] font-black transition-all ${resumo.aproveitamento >= 0.5 ? 'text-orange-500' : 'text-slate-300'}`}
-                    >
-                      R$ {(valorMesada * 0.5).toFixed(2)}
-                    </motion.p>
-                    <div className={`w-full rounded-t-2xl border-b-0 border-4 transition-all duration-700 ${
-                      resumo.aproveitamento >= 0.5 
-                        ? 'bg-gradient-to-t from-orange-500 to-yellow-400 border-orange-600 h-20 shadow-[0_10px_0_0_rgba(249,115,22,0.2)]' 
-                        : 'bg-slate-100 border-slate-200 h-10'
-                    }`}></div>
+                    <p className={`text-[11px] font-black ${resumo.aproveitamento >= 0.5 ? 'text-orange-500' : 'text-slate-300'}`}>R$ {(valorMesada * 0.5).toFixed(2)}</p>
+                    <div className={`w-full rounded-t-2xl border-4 transition-all duration-700 ${resumo.aproveitamento >= 0.5 ? 'bg-gradient-to-t from-orange-500 to-yellow-400 border-orange-600 h-20' : 'bg-slate-100 border-slate-200 h-10'}`}></div>
                     <p className={`text-[10px] font-black uppercase ${resumo.aproveitamento >= 0.5 ? 'text-orange-600' : 'text-slate-400'}`}>50%</p>
                   </div>
 
-                  {/* META 100% - VERDE NEON (CENTRO) */}
                   <div className="flex flex-col items-center gap-2">
-                    <motion.p 
-                      animate={resumo.aproveitamento >= 1 ? { scale: 1.2, y: -10 } : { scale: 1 }}
-                      className={`text-[12px] font-black transition-all ${resumo.aproveitamento >= 0.85 ? 'text-green-500' : 'text-slate-300'}`}
-                    >
-                      R$ {(valorMesada).toFixed(2)}
-                    </motion.p>
-                    <div className={`w-full rounded-t-2xl border-b-0 border-4 relative transition-all duration-700 ${
-                      resumo.aproveitamento >= 0.85
-                        ? 'bg-gradient-to-t from-green-500 to-lime-400 border-green-600 h-32 shadow-[0_10px_0_0_rgba(34,197,94,0.3)]' 
-                        : 'bg-slate-100 border-slate-200 h-10'
-                    }`}>
+                    <p className={`text-[12px] font-black ${resumo.aproveitamento >= 0.85 ? 'text-green-500' : 'text-slate-300'}`}>R$ {(valorMesada).toFixed(2)}</p>
+                    <div className={`w-full rounded-t-2xl border-4 relative transition-all duration-700 ${resumo.aproveitamento >= 0.85 ? 'bg-gradient-to-t from-green-500 to-lime-400 border-green-600 h-32' : 'bg-slate-100 border-slate-200 h-10'}`}>
                         {resumo.aproveitamento >= 0.85 && (
-                          <motion.div 
-                            animate={{ y: [0, -8, 0] }}
-                            transition={{ repeat: Infinity, duration: 2 }}
-                            className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full"
-                          >
-                            <Trophy className="text-yellow-400 drop-shadow-[0_4px_0_rgba(0,0,0,0.1)]" size={36} fill="currentColor" />
-                          </motion.div>
+                          <div className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full">
+                            <Trophy className="text-yellow-400" size={36} fill="currentColor" />
+                          </div>
                         )}
                     </div>
                     <p className={`text-[10px] font-black uppercase ${resumo.aproveitamento >= 0.85 ? 'text-green-600' : 'text-slate-400'}`}>100%</p>
                   </div>
 
-                  {/* META 70% - AZUL ELÉTRICO */}
                   <div className="flex flex-col items-center gap-2">
-                    <motion.p 
-                      animate={resumo.aproveitamento >= 0.7 && resumo.aproveitamento < 1 ? { scale: 1.1, y: -5 } : { scale: 1 }}
-                      className={`text-[11px] font-black transition-all ${resumo.aproveitamento >= 0.7 ? 'text-blue-500' : 'text-slate-300'}`}
-                    >
-                      R$ {(valorMesada * 0.7).toFixed(2)}
-                    </motion.p>
-                    <div className={`w-full rounded-t-2xl border-b-0 border-4 transition-all duration-700 ${
-                      resumo.aproveitamento >= 0.7 
-                        ? 'bg-gradient-to-t from-blue-600 to-cyan-400 border-blue-700 h-24 shadow-[0_10px_0_0_rgba(37,99,235,0.2)]' 
-                        : 'bg-slate-100 border-slate-200 h-10'
-                    }`}></div>
+                    <p className={`text-[11px] font-black ${resumo.aproveitamento >= 0.7 ? 'text-blue-500' : 'text-slate-300'}`}>R$ {(valorMesada * 0.7).toFixed(2)}</p>
+                    <div className={`w-full rounded-t-2xl border-4 transition-all duration-700 ${resumo.aproveitamento >= 0.7 ? 'bg-gradient-to-t from-blue-600 to-cyan-400 border-blue-700 h-24' : 'bg-slate-100 border-slate-200 h-10'}`}></div>
                     <p className={`text-[10px] font-black uppercase ${resumo.aproveitamento >= 0.7 ? 'text-blue-600' : 'text-slate-400'}`}>70%</p>
                   </div>
                 </div>
 
-                {/* INDICADOR DE POSIÇÃO ATUAL */}
+                {/* INDICADOR DE PROGRESO */}
                 <div className="relative pt-6">
                     <div className="w-full h-5 bg-slate-100 rounded-full overflow-hidden border-2 border-slate-200">
                         <motion.div 
                             initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(resumo.aproveitamento * 100, 100)}%` }}
-                            className={`h-full transition-colors ${
-                              resumo.aproveitamento >= 1 ? 'bg-green-500' : 
-                              resumo.aproveitamento >= 0.7 ? 'bg-blue-500' : 
-                              resumo.aproveitamento >= 0.5 ? 'bg-orange-500' : 'bg-slate-300'
-                            }`}
+                            animate={{ width: `${Math.min((resumo.aproveitamento / 0.85) * 100, 100)}%` }}
+                            className={`h-full ${resumo.aproveitamento >= 0.85 ? 'bg-green-500' : resumo.aproveitamento >= 0.7 ? 'bg-blue-500' : resumo.aproveitamento >= 0.5 ? 'bg-orange-500' : 'bg-slate-300'}`}
                         />
                     </div>
                     <div className="flex justify-between mt-2 px-1">
-                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Progresso do Herói: {Math.round(resumo.aproveitamento * 100)}%</span>
+                         <span className="text-[10px] font-black text-slate-400 uppercase">Progresso: {Math.round(resumo.aproveitamento * 100)}%</span>
                          <span className="text-[10px] font-black text-blue-600 uppercase italic">
-                           {resumo.aproveitamento >= 1 ? "Incrível! Tudo Feito!" : `Faltam ${resumo.possivel - resumo.ganho} pts para a próxima meta`}
+                           {resumo.aproveitamento >= 0.85 ? "Meta Máxima Batida!" : `Faltam ${resumo.possivel - resumo.ganho} pts`}
                          </span>
                     </div>
                 </div>
 
-                {/* LISTA DE MISSÕES - Mostra todas as tarefas da semana projetadas pelo servidor */}
+                {/* LISTA DE MISSÕES DETALHADA */}
                 <div className="space-y-3 pt-4 border-t border-slate-50">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Detalhamento das Missões (Semana Completa)</p>
-                  {/* Ordenamos por data para facilitar a leitura da semana */}
-                  {extrato[labelSemana].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((item: any) => {
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Detalhamento das Missões</p>
+                  {extrato[labelSemana].map((item: any) => {
                     const isConcluido = item.status === 'CONCLUIDO';
+                    // Criamos a data e ajustamos para evitar erro de fuso no cliente
+                    const dataItem = new Date(item.date);
+                    
                     return (
                       <div 
                         key={item.id}
@@ -261,8 +228,9 @@ export default function ExtratoMensalClient({
                             <p className={`font-black text-[13px] uppercase tracking-tight leading-tight ${isConcluido ? 'text-slate-700' : 'text-slate-400'}`}>
                               {item.description}
                             </p>
-                            <p suppressHydrationWarning className="text-[9px] font-black text-slate-400 uppercase mt-0.5">
-                              {new Date(item.date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' })}
+                            {/* EXIBIÇÃO DO DIA E MÊS SOLICITADO */}
+                            <p suppressHydrationWarning className="text-[9px] font-black text-[#5D00FF] uppercase mt-0.5">
+                              {format(dataItem, "EEEEEE dd/MM", { locale: ptBR })}
                             </p>
                           </div>
                         </div>

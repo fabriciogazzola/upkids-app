@@ -4,10 +4,12 @@ import { motion } from "framer-motion";
 import { CheckCircle2, Circle, Star, Trash2, User, ArrowLeft, Sun, CloudSun, Moon } from "lucide-react";
 import { toggleTarefaAction, deletarTarefaAction } from "./actions";
 import { useRouter } from "next/navigation";
+import { format, startOfWeek, addDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function TabelaMissoes({ tarefas = [], dataAtual, viewingUserId, progressoDia }: any) {
   const router = useRouter();
- const diasAbreviados = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
+  const diasAbreviados = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
   
   // Garantir que a data seja tratada corretamente sem bugs de fuso horário local
   const dataRef = new Date(dataAtual + "T12:00:00");
@@ -19,13 +21,19 @@ export default function TabelaMissoes({ tarefas = [], dataAtual, viewingUserId, 
     NOITE: { icon: <Moon size={12} />, label: "Noite", color: "bg-indigo-50 text-indigo-600", border: "border-indigo-100" }
   };
 
+  /**
+   * Função ajustada para manter a semana vigente
+   * Utiliza o início da semana (Domingo) como âncora para evitar pulos indesejados.
+   */
   const mudarDia = (diaNome: string) => {
     const mapa: any = { "DOM": 0, "SEG": 1, "TER": 2, "QUA": 3, "QUI": 4, "SEX": 5, "SAB": 6 };
     const alvo = mapa[diaNome];
-    const d = new Date(dataRef);
-    const diff = alvo === 0 ? (diaSelecionadoIndex === 0 ? 0 : 7 - diaSelecionadoIndex) : (alvo - diaSelecionadoIndex);
-    d.setDate(dataRef.getDate() + diff);
-    router.push(`/dashboard/pais?date=${d.toISOString().split('T')[0]}&tab=missoes&userId=${viewingUserId}`);
+    
+    // Calcula o domingo da semana que já está sendo visualizada
+    const domingoDestaSemana = startOfWeek(dataRef, { weekStartsOn: 0 });
+    const novaData = addDays(domingoDestaSemana, alvo);
+
+    router.push(`/dashboard/pais?date=${novaData.toISOString().split('T')[0]}&tab=missoes&userId=${viewingUserId}`);
   };
 
   const handleDeletar = async (taskId: string, description: string) => {
@@ -67,20 +75,28 @@ export default function TabelaMissoes({ tarefas = [], dataAtual, viewingUserId, 
         </div>
       </div>
 
-      {/* Régua de Dias */}
+      {/* Régua de Dias com Data Detalhada */}
       <div className="flex justify-between bg-white p-2 rounded-2xl shadow-sm border border-slate-100 overflow-x-auto no-scrollbar gap-1">
-        {diasAbreviados.map((dia) => {
+        {diasAbreviados.map((diaNome) => {
           const mapaDias: any = { "DOM": 0, "SEG": 1, "TER": 2, "QUA": 3, "QUI": 4, "SEX": 5, "SAB": 6 };
-          const isAtivo = mapaDias[dia] === diaSelecionadoIndex;
+          const indice = mapaDias[diaNome];
+          const isAtivo = indice === diaSelecionadoIndex;
+          
+          // Calcula a data real de cada botão para exibir o dia/mês
+          const dataBotao = addDays(startOfWeek(dataRef, { weekStartsOn: 0 }), indice);
+
           return (
             <button
-              key={dia}
-              onClick={() => mudarDia(dia)}
-              className={`flex-1 min-w-[42px] py-3 rounded-xl font-black text-[10px] transition-all ${
+              key={diaNome}
+              onClick={() => mudarDia(diaNome)}
+              className={`flex-1 min-w-[50px] py-2 rounded-xl flex flex-col items-center transition-all ${
                 isAtivo ? 'bg-yellow-400 text-yellow-900 shadow-sm' : 'text-slate-300 hover:bg-slate-50'
               }`}
             >
-              {dia}
+              <span className="font-black text-[10px] leading-none mb-1">{diaNome}</span>
+              <span className={`text-[8px] font-bold leading-none ${isAtivo ? 'text-yellow-800' : 'text-slate-300'}`}>
+                {format(dataBotao, "dd/MM")}
+              </span>
             </button>
           );
         })}
@@ -94,7 +110,6 @@ export default function TabelaMissoes({ tarefas = [], dataAtual, viewingUserId, 
           </div>
         ) : (
           periodosUnicos.map((periodoKey) => {
-            // Filtro robusto para evitar erros de case-sensitive
             const tarefasDoPeriodo = tarefas.filter((t: any) => 
               t.period?.toUpperCase() === periodoKey
             );
@@ -117,11 +132,9 @@ export default function TabelaMissoes({ tarefas = [], dataAtual, viewingUserId, 
 
                 <div className="space-y-3">
                   {tarefasDoPeriodo.map((tarefa: any) => {
-                    // CORREÇÃO: Busca o filho ou assume o viewingUserId caso a relação não tenha vindo completa do servidor
                     const filhoVinculado = tarefa.assignedTo?.find((f: any) => f.id === viewingUserId);
                     const nomeExibicao = filhoVinculado?.name || "Herói";
                     
-                    // Se a tarefa não estiver vinculada a esse ID e o servidor não pré-filtrou, não exibe
                     if (tarefa.assignedTo && !filhoVinculado) return null;
 
                     const feito = tarefa.concluintesIds?.includes(viewingUserId);

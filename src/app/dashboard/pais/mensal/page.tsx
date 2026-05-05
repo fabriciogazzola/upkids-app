@@ -13,7 +13,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-// Força o reprocessamento para evitar cache de datas antigas
+// Força o reprocessamento para evitar cache de datas antigas no servidor
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -41,13 +41,12 @@ export default async function PaginaMensal({
 
   const filhoAtual = filhos.find(f => f.id === userId);
 
-  // --- CORREÇÃO DE FUSO HORÁRIO ---
-  // Obtemos a data atual e forçamos o fuso de Brasília (America/Sao_Paulo)
-  // Isso resolve o problema de mostrar dia 02 quando já é dia 03 no Brasil.
+  // --- CORREÇÃO DE FUSO HORÁRIO E TRAVA DE SEMANA ---
+  // Forçamos a data para o fuso de Brasília para evitar que o Domingo vire Sábado no servidor
   const dataHojeBR = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
   const hoje = startOfDay(dataHojeBR); 
   
-  // Define a semana começando no DOMINGO (weekStartsOn: 0)
+  // Define o início da semana sempre no DOMINGO (0)
   const dataBuscaInicio = startOfWeek(hoje, { weekStartsOn: 0 }); 
   const dataBuscaFim = endOfWeek(hoje, { weekStartsOn: 0 });
 
@@ -67,10 +66,11 @@ export default async function PaginaMensal({
   ]);
 
   const extratoFinal: Record<string, any[]> = {};
+  // Usamos um rótulo fixo baseado no início da semana para evitar "pulos" na renderização
   const labelSemana = dataBuscaInicio.getTime().toString();
   extratoFinal[labelSemana] = [];
 
-  // Montar os 7 dias da semana (Domingo a Sábado)
+  // Montar exatamente os 7 dias da semana (Domingo a Sábado)
   let d = new Date(dataBuscaInicio);
 
   for (let i = 0; i < 7; i++) {
@@ -90,6 +90,7 @@ export default async function PaginaMensal({
         id: `${tarefa.id}-${format(dataAtualLoop, "yyyy-MM-dd")}`,
         description: tarefa.description,
         points: tarefa.points,
+        // Enviamos a data formatada para garantir que o Client não precise calcular fuso
         date: dataAtualLoop.toISOString(),
         status: foiFeita ? 'CONCLUIDO' : 'NAO_FEITO'
       });
@@ -98,6 +99,7 @@ export default async function PaginaMensal({
     d = addDays(d, 1);
   }
 
+  // Ordenação cronológica rigorosa dentro da semana
   extratoFinal[labelSemana].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
